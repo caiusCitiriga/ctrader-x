@@ -1,0 +1,43 @@
+{
+    "name": "ctrader-x",
+    "version": "0.1.0",
+    "main": "dist/index.js",
+    "scripts": {
+        "prepare": "tsc",
+        "build": "tsc",
+        "watch": "tsc --watch",
+        "start": "ts-node src/example/example.ts",
+        "test": "jest --detectOpenHandles",
+        "test:watch": "jest --watch"
+    },
+    "keywords": [
+        "cTrader",
+        "broker",
+        "trading",
+        "spotware"
+    ],
+    "author": "Caius Citiriga",
+    "license": "MIT",
+    "description": "Robust cTrader client, with a friendly API",
+    "husky": {
+        "hooks": {
+            "pre-commit": "pretty-quick --staged"
+        }
+    },
+    "devDependencies": {
+        "@jest/globals": "^29.7.0",
+        "@types/jest": "^29.5.14",
+        "@types/node": "^20.17.30",
+        "husky": "^9.1.7",
+        "jest": "^29.7.0",
+        "prettier": "^3.5.3",
+        "pretty-quick": "^4.1.1",
+        "ts-jest": "^29.3.1",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.3"
+    },
+    "dependencies": {
+        "@claasahl/spotware-adapter": "^3.2.0",
+        "dotenv": "^16.4.7"
+    }
+}
