@@ -40,11 +40,11 @@ export class AuthManager {
                         clientSecret: params.clientSecret,
                     },
                 },
-                ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES
+                ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES,
             );
         } catch (error: any) {
             Logger.error(
-                `Application authentication failed: ${JSON.stringify(error)}`
+                `Application authentication failed: ${JSON.stringify(error)}`,
             );
             return false;
         }
@@ -52,6 +52,9 @@ export class AuthManager {
         Logger.debug(`Application authenticated successfully`);
 
         Logger.debug(`Authenticating account...`);
+        Logger.debug(
+            `SPOTWARE__CTID_TRADER_ACCOUNT_ID: ${params.ctidTraderAccountId}`,
+        );
         try {
             await sendAndWait(
                 this.spotwareClient,
@@ -62,13 +65,13 @@ export class AuthManager {
                         ctidTraderAccountId: params.ctidTraderAccountId,
                     },
                 },
-                ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES
+                ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES,
             );
 
             Logger.debug(`Account authenticated successfully`);
         } catch (error) {
             Logger.error(
-                `Account authentication failed: ${JSON.stringify(error)}`
+                `Account authentication failed: ${JSON.stringify(error)}`,
             );
             return false;
         }

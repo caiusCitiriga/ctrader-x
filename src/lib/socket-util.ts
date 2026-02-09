@@ -9,7 +9,7 @@ import { Logger } from './logger';
 export async function sendAndWait<ResponseType>(
     socket: SpotwareClientSocket,
     message: Messages,
-    responseTypeMatcher: ProtoPayloadType | ProtoOAPayloadType
+    responseTypeMatcher: ProtoPayloadType | ProtoOAPayloadType,
 ) {
     return new Promise<ResponseType>((resolve, reject) => {
         const onData = (res: Messages) => {
@@ -24,7 +24,7 @@ export async function sendAndWait<ResponseType>(
                 reject(res);
             } else {
                 Logger.warn(
-                    `Unhandled message: ${ProtoOAPayloadType[res.payloadType]}`
+                    `Unhandled message: ${ProtoOAPayloadType[res.payloadType]}`,
                 );
             }
         };
@@ -34,7 +34,7 @@ export async function sendAndWait<ResponseType>(
         const writeResult = socket.write(message, (err) => {
             if (err) {
                 Logger.error(
-                    `Socket write error: ${err.message || err.name}${err.cause ? ' - ' + err.cause : ''}`
+                    `Socket write error: ${err.message || err.name}${err.cause ? ' - ' + err.cause : ''}`,
                 );
                 socket.off('data', onData);
                 reject(err);

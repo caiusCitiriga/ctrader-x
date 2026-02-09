@@ -38,7 +38,7 @@ describe('Socket util', () => {
                 payload: {},
                 payloadType: ProtoOAPayloadType.PROTO_OA_VERSION_REQ,
             },
-            ProtoOAPayloadType.PROTO_OA_VERSION_RES
+            ProtoOAPayloadType.PROTO_OA_VERSION_RES,
         );
 
         expect(response.payload.version).toBe('100');
@@ -67,7 +67,7 @@ describe('Socket util', () => {
                     payload: {},
                     payloadType: ProtoOAPayloadType.PROTO_OA_VERSION_REQ,
                 },
-                ProtoOAPayloadType.PROTO_OA_VERSION_RES
+                ProtoOAPayloadType.PROTO_OA_VERSION_RES,
             );
         } catch (err: any) {
             expect(err.payload.errorCode).toBe('999');
@@ -92,7 +92,7 @@ describe('Socket util', () => {
                     payload: {},
                     payloadType: ProtoOAPayloadType.PROTO_OA_VERSION_REQ,
                 },
-                ProtoOAPayloadType.PROTO_OA_VERSION_RES
+                ProtoOAPayloadType.PROTO_OA_VERSION_RES,
             );
         } catch (err: any) {
             expect(err).toBeInstanceOf(Error);

@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 
 export class Config {
     static get SPOTWARE__CTID_TRADER_ACCOUNT_ID() {
@@ -6,7 +7,7 @@ export class Config {
         const value = this.getConfig('SPOTWARE__CTID_TRADER_ACCOUNT_ID');
         if (!!value && !isNaN(+value)) return +value;
         throw new Error(
-            `Invalid SPOTWARE__CTID_TRADER_ACCOUNT_ID. Should be a number`
+            `Invalid SPOTWARE__CTID_TRADER_ACCOUNT_ID. Should be a number`,
         );
     }
 

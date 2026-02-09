@@ -6,6 +6,7 @@
         "prepare": "tsc",
         "build": "tsc",
         "watch": "tsc --watch",
+        "start:prod": "node dist/example/example.js",
         "start": "ts-node src/example/example.ts",
         "test": "jest --detectOpenHandles",
         "test:watch": "jest --watch"

@@ -34,11 +34,11 @@ describe('Auth manager', () => {
                 accessToken: Config.SPOTWARE__ACCESS_TOKEN!,
                 clientSecret: Config.SPOTWARE__CLIENT_SECRET!,
                 ctidTraderAccountId: Config.SPOTWARE__CTID_TRADER_ACCOUNT_ID!,
-            })
+            }),
         ).toBeTruthy();
         expect(authManger.isAuthenticated).toBeTruthy();
         expect(authManger.ctidTraderAccountId).toBe(
-            +process.env.SPOTWARE__CTID_TRADER_ACCOUNT_ID!
+            +process.env.SPOTWARE__CTID_TRADER_ACCOUNT_ID!,
         );
     });
 
@@ -49,7 +49,7 @@ describe('Auth manager', () => {
                 accessToken: Config.SPOTWARE__ACCESS_TOKEN!,
                 clientSecret: Config.SPOTWARE__CLIENT_SECRET!,
                 ctidTraderAccountId: Config.SPOTWARE__CTID_TRADER_ACCOUNT_ID!,
-            })
+            }),
         ).toBeFalsy();
         expect(authManger.isAuthenticated).toBeFalsy();
         expect(authManger.ctidTraderAccountId).toBeUndefined();
@@ -63,7 +63,7 @@ describe('Auth manager', () => {
                 clientSecret: Config.SPOTWARE__CLIENT_SECRET!,
                 ctidTraderAccountId:
                     Config.SPOTWARE__CTID_TRADER_ACCOUNT_ID! + 1000,
-            })
+            }),
         ).toBeFalsy();
         expect(authManger.isAuthenticated).toBeFalsy();
         expect(authManger.ctidTraderAccountId).toBeUndefined();

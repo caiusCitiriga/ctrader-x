@@ -1,6 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
 import { ConnectionManger } from '../../src/lib/connection-manager';
-import { SpotwareClientSocket } from '@claasahl/spotware-adapter';
 
 describe('Connection manager', () => {
     let connectionManager: ConnectionManger;
