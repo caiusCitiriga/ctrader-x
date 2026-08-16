@@ -1,5 +1,9 @@
 build/
 
+# Internal planning docs, not part of the published package
+CLAUDE.md
+TODO.md
+
 # Created by https://www.toptal.com/developers/gitignore/api/node,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,macos
 
@@ -117,6 +121,9 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+
+# Spotware OAuth token cache written by the example script
+.spotware-token.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
