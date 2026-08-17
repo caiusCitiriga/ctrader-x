@@ -1,4 +1,5 @@
 import { SpotwareMarketData } from '../market-data';
+import { SPOTWARE_VOLUME_SCALE } from '../shared/spotware-scale';
 import { createAuthenticatedClient } from './shared/create-authenticated-client';
 
 const SYMBOL_NAME = process.argv[2] ?? 'EURUSD';
@@ -17,6 +18,22 @@ async function main(): Promise<void> {
     const symbol = await marketData.symbols.findByName(SYMBOL_NAME);
     if (!symbol) {
         throw new Error(`Symbol "${SYMBOL_NAME}" was not found for this account`);
+    }
+
+    // getFullSymbol() is the full per-symbol spec — findByName()/getAll() only return the
+    // light list, which doesn't carry the fields you need to validate a volume or round a
+    // price correctly, since those are defined per symbol by the broker, not a fixed ratio.
+    const fullSymbol = await marketData.symbols.getFullSymbol(symbol.symbolId);
+    if (fullSymbol) {
+        console.log(`\n${symbol.symbolName} trading constraints:`);
+        console.table({
+            digits: fullSymbol.digits,
+            pipPosition: fullSymbol.pipPosition,
+            lotSizeUnits: (fullSymbol.lotSize ?? 0) / SPOTWARE_VOLUME_SCALE,
+            minVolumeUnits: (fullSymbol.minVolume ?? 0) / SPOTWARE_VOLUME_SCALE,
+            maxVolumeUnits: (fullSymbol.maxVolume ?? 0) / SPOTWARE_VOLUME_SCALE,
+            stepVolumeUnits: (fullSymbol.stepVolume ?? 0) / SPOTWARE_VOLUME_SCALE
+        });
     }
 
     console.log(`\nSubscribing to ${symbol.symbolName} (symbolId ${symbol.symbolId})...`);

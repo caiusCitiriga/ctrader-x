@@ -117,6 +117,14 @@ if (symbol) {
 
 `marketData.symbols` is a `SpotwareSymbolCatalog` — it can also be used on its own (`new SpotwareSymbolCatalog(client)`) if you only need symbol lookups.
 
+`findByName`/`getAll` return the light symbol list — enough to resolve a name to a `symbolId` and subscribe. For the trading constraints that list doesn't carry (`lotSize`, `minVolume`/`maxVolume`/`stepVolume`, `digits`, `pipPosition`), fetch the full spec:
+
+```typescript
+const fullSymbol = await marketData.symbols.getFullSymbol(symbol.symbolId);
+```
+
+See [A note on volume](#a-note-on-volume) under Trading for why these matter before placing an order.
+
 ### Trading
 
 ```typescript
@@ -137,7 +145,13 @@ const { positions, orders } = await trading.getOpenPositionsAndOrders();
 
 `volume` here is in **units** of the symbol's base currency (for EURUSD, 1 unit = 1 EUR), not lots. On the wire, cTrader represents volume as "cents of a unit" — `100000` means `1000.00` units — and `trading` converts to and from that form for you, so you always work in whole units through this API, never the wire's scaled integer.
 
-Units and lots are not the same thing, and the conversion between them is **not a fixed ratio you can hardcode**. How many units make up "1 lot" is defined per symbol, not by the protocol — retail forex conventionally uses 100,000 units per lot, but that's a market convention, not something cTrader's API guarantees for every symbol (it can differ for indices, commodities, crypto, or simply per broker). The authoritative values — `lotSize`, plus the tradable `minVolume`/`maxVolume`/`stepVolume` range — live on the full symbol spec (`ProtoOASymbol`, fetched via `PROTO_OA_SYMBOL_BY_ID_REQ`), not on the lighter `ProtoOALightSymbol` that `SpotwareSymbolCatalog` currently exposes. If your UI works in lots, fetch that full spec yourself and convert before calling `trading`; `ctrader-x` doesn't wrap that request yet.
+Units and lots are not the same thing, and the conversion between them is **not a fixed ratio you can hardcode**. How many units make up "1 lot" is defined per symbol, not by the protocol — retail forex conventionally uses 100,000 units per lot, but that's a market convention, not something cTrader's API guarantees for every symbol (it can differ for indices, commodities, crypto, or simply per broker). The authoritative values — `lotSize`, plus the tradable `minVolume`/`maxVolume`/`stepVolume` range — live on the full symbol spec, not the lighter one `getAll()`/`findByName()` return:
+
+```typescript
+const fullSymbol = await marketData.symbols.getFullSymbol(symbol.symbolId);
+```
+
+If your UI works in lots, or you want to validate a volume before sending it, fetch that spec and convert or check against it before calling `trading`. `ctrader-x` gives you the raw values; it doesn't do that conversion or validation for you.
 
 More complete, runnable examples live in [`src/example/`](src/example/):
 

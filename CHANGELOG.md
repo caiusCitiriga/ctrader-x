@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-17
+
+### Added
+
+- `SpotwareSymbolCatalog.getFullSymbol(symbolId)` — fetches the full per-symbol spec (`lotSize`, `minVolume`/`maxVolume`/`stepVolume`, `digits`, `pipPosition`, and the rest of `ProtoOASymbol`) that the light symbol list used by `getAll()`/`findByName()`/`findById()` doesn't carry. Needed to validate a volume or round a price correctly before placing an order, since those constraints are defined per symbol by the broker, not a fixed ratio. Cached per `symbolId`, with the same dedup-in-flight and don't-cache-failures behavior as the existing symbol list.
+
 ## [0.1.0] - 2026-08-17
 
 ### Added

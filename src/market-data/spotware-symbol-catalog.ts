@@ -1,5 +1,13 @@
 import type { SpotwareClient } from '../client';
-import { ProtoOALightSymbol, ProtoOAPayloadType, ProtoOASymbolsListReq, ProtoOASymbolsListRes } from '../types';
+import {
+    ProtoOALightSymbol,
+    ProtoOAPayloadType,
+    ProtoOASymbol,
+    ProtoOASymbolByIdReq,
+    ProtoOASymbolByIdRes,
+    ProtoOASymbolsListReq,
+    ProtoOASymbolsListRes
+} from '../types';
 
 /**
  * Fetches and caches the account's symbol list, and resolves a ticker name (e.g. "EURUSD")
@@ -9,6 +17,7 @@ import { ProtoOALightSymbol, ProtoOAPayloadType, ProtoOASymbolsListReq, ProtoOAS
  */
 export class SpotwareSymbolCatalog {
     private symbolsPromise: Promise<ProtoOALightSymbol[]> | undefined;
+    private readonly fullSymbolPromises = new Map<number, Promise<ProtoOASymbol | undefined>>();
 
     constructor(private readonly client: SpotwareClient) {}
 
@@ -40,6 +49,22 @@ export class SpotwareSymbolCatalog {
         return this.symbolsPromise;
     }
 
+    /**
+     * Fetches the full symbol spec — lotSize, minVolume/maxVolume/stepVolume, digits,
+     * pipPosition, and everything else `getAll()`'s light list doesn't carry. Needed to
+     * validate a volume or round a price correctly before placing an order: those constraints
+     * are defined per symbol by the broker, not by a fixed, hardcodable ratio.
+     */
+    async getFullSymbol(symbolId: number): Promise<ProtoOASymbol | undefined> {
+        let promise = this.fullSymbolPromises.get(symbolId);
+        if (!promise) {
+            promise = this.fetchFullSymbol(symbolId);
+            this.fullSymbolPromises.set(symbolId, promise);
+        }
+
+        return promise;
+    }
+
     private async fetchSymbols(): Promise<ProtoOALightSymbol[]> {
         try {
             const request = ProtoOASymbolsListReq.fromPartial({ ctidTraderAccountId: this.client.ctidTraderAccountId });
@@ -53,6 +78,18 @@ export class SpotwareSymbolCatalog {
             // Don't cache a failure — the next call should retry instead of returning a
             // permanently broken rejected promise.
             this.symbolsPromise = undefined;
+            throw error;
+        }
+    }
+
+    private async fetchFullSymbol(symbolId: number): Promise<ProtoOASymbol | undefined> {
+        try {
+            const request = ProtoOASymbolByIdReq.fromPartial({ ctidTraderAccountId: this.client.ctidTraderAccountId, symbolId: [symbolId] });
+            const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_SYMBOL_BY_ID_REQ, ProtoOASymbolByIdReq.encode(request).finish());
+
+            return ProtoOASymbolByIdRes.decode(response.payload ?? new Uint8Array()).symbol.find((symbol) => symbol.symbolId === symbolId);
+        } catch (error) {
+            this.fullSymbolPromises.delete(symbolId);
             throw error;
         }
     }
