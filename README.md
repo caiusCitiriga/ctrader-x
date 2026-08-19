@@ -1,4 +1,4 @@
-# ctrader-x
+# CTrader-x
 
 A TypeScript SDK for cTrader's Open API — connect, authenticate, stream prices, and trade, with automatic reconnection built in.
 
@@ -125,6 +125,19 @@ const fullSymbol = await marketData.symbols.getFullSymbol(symbol.symbolId);
 
 See [A note on volume](#a-note-on-volume) under Trading for why these matter before placing an order.
 
+Historical bars are a one-off fetch, not a subscription:
+
+```typescript
+import { ProtoOATrendbarPeriod } from 'ctrader-x';
+
+const bars = await marketData.getTrendbars({
+    symbolId: symbol.symbolId,
+    period: ProtoOATrendbarPeriod.H1,
+    fromTimestamp: Date.now() - 7 * 24 * 60 * 60 * 1000, // last 7 days
+    toTimestamp: Date.now()
+});
+```
+
 ### Trading
 
 ```typescript
@@ -158,7 +171,280 @@ More complete, runnable examples live in [`src/example/`](src/example/):
 ```bash
 npm run start:market-data   # subscribe to a symbol and print live prices
 npm run start:trading       # query positions/orders, place and cancel a safe limit order
+npm run start:trendbars     # fetch the last 24h of H1 bars for a symbol
 ```
+
+## API Reference
+
+Everything below is exported from the package root (`import { ... } from 'ctrader-x'`). Classes with events expose `once()` and `off()` with the same signatures as `on()`. The generated Protobuf message and enum types (`ProtoOA...`, `Proto...` — roughly 300 of them) aren't listed individually; see [Types](#types) at the end.
+
+### Transport
+
+#### `SpotwareTransport`
+
+Opens the TCP/TLS connection, frames Protobuf messages on the wire, and auto-reconnects with backoff on any drop that wasn't requested via `disconnect()`.
+
+```typescript
+class SpotwareTransport {
+    constructor(options: ISpotwareTransportOptions);
+
+    connect(): Promise<void>;
+    disconnect(): Promise<void>;
+    send(message: ProtoMessage): Promise<void>;
+
+    on(event: 'connected', listener: () => void): this;
+    on(event: 'disconnected', listener: (reason: SpotwareDisconnectReason) => void): this;
+    on(event: 'reconnecting', listener: (attempt: number, delayMs: number) => void): this;
+    on(event: 'message', listener: (message: ProtoMessage) => void): this;
+    on(event: 'error', listener: (error: Error) => void): this;
+}
+
+interface ISpotwareTransportOptions {
+    host: SpotwareHost;
+    port?: number;                                 // default: SPOTWARE_PORT (5035)
+    reconnectBackoff?: IReconnectBackoffOptions;    // default: DEFAULT_RECONNECT_BACKOFF_OPTIONS
+    socketFactory?: SpotwareSocketFactory;          // default: real tls.connect; override for testing
+    staleConnectionTimeoutMs?: number;              // default: 30000
+}
+```
+
+- `connect()` rejects if the very first attempt fails — likely a config problem worth surfacing, not something to retry silently. A later reconnect attempt that fails keeps retrying with backoff instead of stopping, since by then the target is already known to be reachable.
+- `disconnect()` is an intentional disconnect: no auto-reconnect follows it.
+- A liveness watchdog force-reconnects if no data has been received for `staleConnectionTimeoutMs`. A silent network outage produces no socket-level `error`/`close` on its own — TCP only notices once something tries to use the connection, which can take far longer than that timeout.
+
+```typescript
+enum SpotwareHost {
+    DEMO = 'demo.ctraderapi.com',
+    LIVE = 'live.ctraderapi.com'
+}
+```
+
+| Other export | Description |
+| --- | --- |
+| `SPOTWARE_PORT` | `5035` — cTrader's Open API TCP port. |
+| `IReconnectBackoffOptions` | `{ baseDelayMs, maxDelayMs, factor }` |
+| `DEFAULT_RECONNECT_BACKOFF_OPTIONS` | `{ baseDelayMs: 500, maxDelayMs: 30_000, factor: 2 }` |
+| `calculateReconnectDelayMs(attempt, options?)` | Pure function computing the next backoff delay, with jitter. |
+| `SpotwareSocketFactory` | `(port, host) => Promise<Duplex>` — inject a test double instead of a real socket. |
+| `SpotwareDisconnectReason` | `'manual' \| 'dropped'` |
+
+### Auth
+
+#### `SpotwareOAuthClient`
+
+The HTTP half of the OAuth2 flow: authorize URL, code exchange, refresh. Knows nothing about the socket.
+
+```typescript
+class SpotwareOAuthClient {
+    constructor(options: { clientId: string; clientSecret: string });
+
+    buildAuthorizationUrl(params: { redirectUri: string; scope: SpotwareOAuthScope }): string;
+    exchangeAuthorizationCode(params: { code: string; redirectUri: string }): Promise<ISpotwareOAuthToken>;
+    refreshAccessToken(params: { refreshToken: string }): Promise<ISpotwareOAuthToken>;
+}
+```
+
+Throws `SpotwareOAuthError` (`errorCode?: string`, `httpStatus?: number`) on failure. Refresh tokens are single-use — always persist the token returned from a refresh call, not just the original one.
+
+#### `SpotwareSocketAuthenticator`
+
+The socket half of authentication: `ApplicationAuthReq` → `GetAccountListByAccessTokenReq` → `AccountAuthReq`. Requires an already-connected `SpotwareTransport`.
+
+```typescript
+class SpotwareSocketAuthenticator {
+    constructor(transport: SpotwareTransport, options?: { responseTimeoutMs?: number }); // default: 10000
+
+    authenticateApplication(clientId: string, clientSecret: string): Promise<void>;
+    listAccounts(accessToken: string): Promise<ProtoOACtidTraderAccount[]>;
+    authenticateAccount(ctidTraderAccountId: number, accessToken: string): Promise<void>;
+}
+```
+
+Throws `SpotwareSocketAuthError` (`errorCode?: string`) on failure. Most consumers won't call this directly — `SpotwareClient` runs this handshake automatically, including after every reconnect. It's exposed for the one-time account discovery step; see [Authenticating for the first time](#authenticating-for-the-first-time).
+
+| Other export | Description |
+| --- | --- |
+| `SpotwareOAuthScope` | `enum { ACCOUNTS = 'accounts', TRADING = 'trading' }` |
+| `ISpotwareOAuthToken` | `{ accessToken, refreshToken, tokenType, expiresIn }` |
+| `SpotwareOAuthError` | `Error` subclass — `errorCode?`, `httpStatus?` |
+| `SpotwareSocketAuthError` | `Error` subclass — `errorCode?` |
+
+### Client
+
+#### `SpotwareClient`
+
+Request/response correlation on top of `transport` + `auth`: tags each request with a `clientMsgId` and resolves once the matching response arrives. Re-runs the auth handshake on every `transport` `'connected'` event, including reconnects, and refreshes the token when it's close to expiry.
+
+```typescript
+class SpotwareClient {
+    constructor(options: ISpotwareClientOptions);
+
+    readonly ctidTraderAccountId: number;
+
+    connect(): Promise<void>;
+    disconnect(): Promise<void>;
+    send(payloadType: number, payload: Uint8Array): Promise<ProtoMessage>;
+
+    on(event: 'authenticated', listener: () => void): this;
+    on(event: 'tokenRefreshed', listener: (token: ISpotwareOAuthToken) => void): this;
+    on(event: 'message', listener: (message: ProtoMessage) => void): this;
+    on(event: 'error', listener: (error: Error) => void): this;
+}
+
+interface ISpotwareClientOptions {
+    transport: SpotwareTransport;
+    oauthClient: SpotwareOAuthClient;
+    clientId: string;
+    clientSecret: string;
+    ctidTraderAccountId: number;
+    token: ISpotwareOAuthToken;
+    requestTimeoutMs?: number;       // default: 10000
+    tokenRefreshBufferMs?: number;   // default: 300000 (refresh 5 minutes before expiry)
+}
+```
+
+- `send()` rejects with `SpotwareRequestError` on a correlated error response, on timeout, or immediately if the connection drops while the request is in flight — it doesn't wait out its own timeout once `transport` already knows the connection is gone.
+- The `'message'` event fires for every message received, including ones with no matching pending request (e.g. spot price events). `market-data` and `trading` are built on this.
+- Always attach an `'error'` listener — per Node's `EventEmitter` convention, an unlistened `'error'` event throws and crashes the process. `SpotwareClient` forwards `transport`'s errors here too, so this one listener covers both.
+
+| Other export | Description |
+| --- | --- |
+| `SpotwareRequestError` | `Error` subclass — `errorCode?: string` |
+
+### Market data
+
+#### `SpotwareMarketData`
+
+```typescript
+class SpotwareMarketData {
+    constructor(client: SpotwareClient, symbolCatalog?: SpotwareSymbolCatalog);
+
+    readonly symbols: SpotwareSymbolCatalog;
+
+    subscribe(symbol: number | string): Promise<void>;   // a symbolId, or a name resolved via `symbols`
+    unsubscribe(symbol: number | string): Promise<void>;
+    getTrendbars(params: IGetTrendbarsParams): Promise<ITrendbar[]>;   // a one-off fetch, not a subscription
+
+    on(event: 'price', listener: (update: ISpotwarePriceUpdate) => void): this;
+    on(event: 'error', listener: (error: Error) => void): this;
+}
+
+interface ISpotwarePriceUpdate {
+    symbolId: number;
+    bid?: number;       // already converted from the wire's fixed-point form
+    ask?: number;
+    timestamp?: number;
+}
+
+interface IGetTrendbarsParams {
+    symbolId: number;
+    period: ProtoOATrendbarPeriod;
+    fromTimestamp?: number;   // Unix ms, must be >= 0
+    toTimestamp?: number;     // Unix ms, must be <= 2147483646000 (2038-01-19)
+    count?: number;           // caps the number of bars, counting back from toTimestamp
+}
+
+interface ITrendbar {
+    period: ProtoOATrendbarPeriod;
+    timestamp?: number;   // Unix ms, converted from the wire's utcTimestampInMinutes
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+}
+```
+
+Re-subscribes to everything currently subscribed whenever `client` re-authenticates (including after a reconnect) — a fresh connection has no memory of prior subscriptions, so without this a reconnect would silently go quiet on price data.
+
+`getTrendbars` fetches historical bars once; it doesn't subscribe to anything ongoing. Bar prices (`open`/`high`/`low`/`close`) are converted for you the same way spot prices are — confirmed against cTrader's own documentation, since the field comments in the underlying Protobuf message don't state the scale themselves.
+
+#### `SpotwareSymbolCatalog`
+
+Public on its own (`new SpotwareSymbolCatalog(client)`), and used internally by `SpotwareMarketData` — `marketData.symbols` is one of these.
+
+```typescript
+class SpotwareSymbolCatalog {
+    constructor(client: SpotwareClient);
+
+    getAll(): Promise<ProtoOALightSymbol[]>;
+    findByName(symbolName: string): Promise<ProtoOALightSymbol | undefined>;   // case-insensitive
+    findById(symbolId: number): Promise<ProtoOALightSymbol | undefined>;
+    refresh(): Promise<ProtoOALightSymbol[]>;                                  // forces a re-fetch
+
+    getFullSymbol(symbolId: number): Promise<ProtoOASymbol | undefined>;      // lotSize, min/max/stepVolume, digits, pipPosition
+}
+```
+
+`getAll`/`findByName`/`findById` share one cached fetch; `getFullSymbol` caches per `symbolId`. Neither caches a failure — the next call retries instead of returning a permanently broken promise.
+
+### Trading
+
+#### `SpotwareTrading`
+
+Places/modifies/cancels orders and closes positions, via `client`. Knows nothing about market data streaming.
+
+```typescript
+class SpotwareTrading {
+    constructor(client: SpotwareClient);
+
+    placeMarketOrder(params: IPlaceMarketOrderParams): Promise<ProtoOAExecutionEvent>;
+    placeLimitOrder(params: IPlaceLimitOrderParams): Promise<ProtoOAExecutionEvent>;
+    amendOrder(params: IAmendOrderParams): Promise<ProtoOAExecutionEvent>;
+    cancelOrder(orderId: number): Promise<ProtoOAExecutionEvent>;
+    closePosition(params: IClosePositionParams): Promise<ProtoOAExecutionEvent>;
+    getOpenPositionsAndOrders(): Promise<IOpenPositionsAndOrders>;
+}
+
+interface IPlaceMarketOrderParams {
+    symbolId: number;
+    tradeSide: ProtoOATradeSide;
+    volume: number;          // in units — see "A note on volume" above
+    stopLoss?: number;       // absolute price, not scaled
+    takeProfit?: number;     // absolute price, not scaled
+    comment?: string;
+    label?: string;
+}
+
+interface IPlaceLimitOrderParams extends IPlaceMarketOrderParams {
+    limitPrice: number;      // absolute price, not scaled
+    timeInForce?: ProtoOATimeInForce;
+    expirationTimestamp?: number;
+}
+
+interface IAmendOrderParams {
+    orderId: number;
+    volume?: number;         // in units
+    limitPrice?: number;
+    stopPrice?: number;
+    stopLoss?: number;
+    takeProfit?: number;
+    expirationTimestamp?: number;
+}
+
+interface IClosePositionParams {
+    positionId: number;
+    volume: number;          // in units
+}
+
+interface IOpenPositionsAndOrders {
+    positions: ProtoOAPosition[];
+    orders: ProtoOAOrder[];
+}
+```
+
+Order mutations have no dedicated response message — the outcome arrives as a `ProtoOAExecutionEvent` on success, and `send()` rejects with `SpotwareRequestError` on failure. Both are already handled for you; these methods just resolve or reject.
+
+### Shared
+
+| Export | Description |
+| --- | --- |
+| `SPOTWARE_PRICE_SCALE` | `100_000` — the fixed-point scale for bid/ask and relative SL/TP. Not every price field uses it; see [A note on volume](#a-note-on-volume). |
+| `SPOTWARE_VOLUME_SCALE` | `100` — the fixed-point scale for volume ("cents of a unit"). |
+
+### Types
+
+Every Protobuf message and enum from Spotware's Open API — `ProtoOANewOrderReq`, `ProtoOATradeSide`, `ProtoOAExecutionEvent`, and roughly 300 more — is generated directly from the official `.proto` files (see [Regenerating protocol types](#regenerating-protocol-types)) and exported from the package root. They aren't listed individually here; each one carries its own field-level doc comments, visible in your editor.
 
 ## Development
 

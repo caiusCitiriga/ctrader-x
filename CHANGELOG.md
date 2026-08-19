@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-19
+
+### Added
+
+- `SpotwareMarketData.getTrendbars(params)` — fetches historical bars for a symbol/period (a one-off request, not a subscription). Converts the wire's delta-encoded, fixed-point OHLC (`low` + `deltaOpen`/`deltaHigh`/`deltaClose`, scaled) into a clean `{ open, high, low, close }` shape, confirmed against cTrader's own documentation since the underlying field comments don't state the scale. Also fixes the same class of bug as `SpotwareTrading`'s `orderType`/`tradeSide`: `period` is a required field with no explicit default, so requesting `M1` bars — the most common choice — was silently dropped from the wire by ts-proto's codegen.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added

@@ -4,8 +4,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpotwareClient } from '../../src/client';
 import { SpotwareMarketData } from '../../src/market-data/spotware-market-data';
 import { encodeFrame } from '../../src/transport/frame-codec';
-import { ProtoMessage, ProtoOAPayloadType, ProtoOASpotEvent, ProtoOASubscribeSpotsReq } from '../../src/types';
+import {
+    ProtoMessage,
+    ProtoOAGetTrendbarsReq,
+    ProtoOAGetTrendbarsRes,
+    ProtoOAPayloadType,
+    ProtoOASpotEvent,
+    ProtoOASubscribeSpotsReq,
+    ProtoOATrendbar,
+    ProtoOATrendbarPeriod
+} from '../../src/types';
 import { createTestClient } from '../shared/create-test-client';
+
+// ts-proto's own decode() defaults an absent required field to the same value encode() skips
+// it at, so a round trip through ts-proto on both ends can't detect this bug — only inspecting
+// the raw wire bytes (as a stricter real server would) can.
+function containsByteSequence(haystack: Uint8Array, needle: number[]): boolean {
+    for (let i = 0; i <= haystack.length - needle.length; i += 1) {
+        if (needle.every((byte, offset) => haystack[i + offset] === byte)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 describe('SpotwareMarketData', () => {
     let server: net.Server;
@@ -149,5 +170,85 @@ describe('SpotwareMarketData', () => {
 
         await vi.waitFor(() => expect(subscribeRequests).toHaveLength(2), { timeout: 2000 });
         expect(subscribeRequests[1]?.symbolId).toEqual([1]);
+    });
+
+    it('fetches trendbars and converts the delta-encoded, scaled OHLC into clean decimals', async () => {
+        const requests: ProtoOAGetTrendbarsReq[] = [];
+        const { client } = createTestClient(server, port, createdClients, {
+            onOtherRequest: (request) => {
+                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ) {
+                    requests.push(ProtoOAGetTrendbarsReq.decode(request.payload ?? new Uint8Array()));
+                    return ProtoMessage.fromPartial({
+                        payloadType: ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
+                        payload: ProtoOAGetTrendbarsRes.encode(
+                            ProtoOAGetTrendbarsRes.fromPartial({
+                                period: ProtoOATrendbarPeriod.H1,
+                                trendbar: [
+                                    ProtoOATrendbar.fromPartial({
+                                        volume: 42,
+                                        period: ProtoOATrendbarPeriod.H1,
+                                        low: 100_000, // 1.00000
+                                        deltaOpen: 500, // open = 1.00500
+                                        deltaHigh: 1_000, // high = 1.01000
+                                        deltaClose: 200, // close = 1.00200
+                                        utcTimestampInMinutes: 1_000
+                                    })
+                                ]
+                            })
+                        ).finish(),
+                        clientMsgId: request.clientMsgId
+                    });
+                }
+                return undefined;
+            }
+        });
+        await client.connect();
+
+        const marketData = new SpotwareMarketData(client);
+        const bars = await marketData.getTrendbars({
+            symbolId: 1,
+            period: ProtoOATrendbarPeriod.H1,
+            fromTimestamp: 1_000_000,
+            toTimestamp: 2_000_000,
+            count: 10
+        });
+
+        expect(requests[0]).toMatchObject({ symbolId: 1, period: ProtoOATrendbarPeriod.H1, fromTimestamp: 1_000_000, toTimestamp: 2_000_000, count: 10 });
+        expect(bars).toEqual([
+            {
+                period: ProtoOATrendbarPeriod.H1,
+                timestamp: 1_000 * 60_000,
+                low: 1.0,
+                open: 1.005,
+                high: 1.01,
+                close: 1.002,
+                volume: 42
+            }
+        ]);
+    });
+
+    it('writes period on the wire even when it is M1 (the implicit proto2 default)', async () => {
+        const rawPayloads: Uint8Array[] = [];
+        const { client } = createTestClient(server, port, createdClients, {
+            onOtherRequest: (request) => {
+                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ) {
+                    rawPayloads.push(request.payload ?? new Uint8Array());
+                    return ProtoMessage.fromPartial({
+                        payloadType: ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
+                        payload: ProtoOAGetTrendbarsRes.encode(ProtoOAGetTrendbarsRes.fromPartial({})).finish(),
+                        clientMsgId: request.clientMsgId
+                    });
+                }
+                return undefined;
+            }
+        });
+        await client.connect();
+
+        const marketData = new SpotwareMarketData(client);
+        await marketData.getTrendbars({ symbolId: 1, period: ProtoOATrendbarPeriod.M1 });
+
+        expect(rawPayloads).toHaveLength(1);
+        // field 5 (period), varint wire type -> tag 0x28, value M1=1
+        expect(containsByteSequence(rawPayloads[0]!, [0x28, ProtoOATrendbarPeriod.M1])).toBe(true);
     });
 });
