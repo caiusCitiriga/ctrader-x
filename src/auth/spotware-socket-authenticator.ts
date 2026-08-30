@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { SpotwareTransport } from '../transport';
 import {
     ProtoErrorRes,
@@ -74,6 +76,8 @@ export class SpotwareSocketAuthenticator {
     }
 
     private sendAndAwait(message: ProtoMessage, expectedPayloadType: ProtoOAPayloadType): Promise<ProtoMessage> {
+        const clientMsgId = randomUUID();
+
         return new Promise((resolve, reject) => {
             let timeout: NodeJS.Timeout;
 
@@ -83,6 +87,14 @@ export class SpotwareSocketAuthenticator {
             };
 
             const onMessage = (received: ProtoMessage) => {
+                // Two handshakes can overlap on one socket (e.g. a reconnect firing while the
+                // previous attempt is still in flight), and both would be waiting on the same
+                // payloadType. Without this, one response would settle both — leaving an
+                // account that never got a reply believing it is authenticated.
+                if (received.clientMsgId && received.clientMsgId !== clientMsgId) {
+                    return;
+                }
+
                 if (received.payloadType === expectedPayloadType) {
                     cleanup();
                     resolve(received);
@@ -109,7 +121,7 @@ export class SpotwareSocketAuthenticator {
             }, this.responseTimeoutMs);
 
             this.transport.on('message', onMessage);
-            this.transport.send(message).catch((error: Error) => {
+            this.transport.send(ProtoMessage.fromPartial({ ...message, clientMsgId })).catch((error: Error) => {
                 cleanup();
                 reject(error);
             });

@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-08-30
+
+### Fixed
+
+- `SpotwareSocketAuthenticator` now tags each handshake request with a `clientMsgId` and ignores responses carrying someone else's, instead of settling on the first message of the expected `payloadType`. Two handshakes can overlap on one socket — a reconnect firing while the previous attempt is still in flight — and both were waiting on the same `payloadType`, so a single response settled both: the attempt that never got a reply reported success and the caller proceeded against an unauthenticated account. Errors that carry no `clientMsgId` at all are still surfaced rather than left to time out, since a connection-level failure can't be attributed to one request.
+
+### Added
+
+- A "Quick reference" section in the README: every exported method, event, interface, constant, error and default in scannable tables, for when you need a signature rather than an explanation.
+
 ## [0.3.0] - 2026-08-19
 
 ### Added

@@ -1,5 +1,5 @@
 import * as net from 'node:net';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpotwareSocketAuthError } from '../../src/auth/spotware-socket-auth-error';
 import { SpotwareSocketAuthenticator } from '../../src/auth/spotware-socket-authenticator';
@@ -55,12 +55,17 @@ describe('SpotwareSocketAuthenticator', () => {
     });
 
     // Decodes the next request the fake server receives and lets the test build the reply,
-    // mirroring how a real cTrader server would respond over the same connection.
-    function respondOnce(build: (request: ProtoMessage) => ProtoMessage): void {
+    // mirroring how a real cTrader server would respond over the same connection — including
+    // echoing the request's clientMsgId, which is how a response is matched to its request.
+    function respondOnce(build: (request: ProtoMessage) => ProtoMessage, { echoClientMsgId = true } = {}): void {
         const decoder = new FrameDecoder();
         const onData = (chunk: Buffer) => {
             for (const frame of decoder.push(chunk)) {
-                const response = build(ProtoMessage.decode(frame));
+                const request = ProtoMessage.decode(frame);
+                const response = ProtoMessage.fromPartial({
+                    ...build(request),
+                    clientMsgId: echoClientMsgId ? request.clientMsgId : undefined
+                });
                 serverSocket.write(encodeFrame(ProtoMessage.encode(response).finish()));
                 serverSocket.off('data', onData);
             }
@@ -98,12 +103,16 @@ describe('SpotwareSocketAuthenticator', () => {
         });
     });
 
+    // Deliberately un-echoed: a connection-level error carrying no clientMsgId can't be
+    // attributed to one request, and must still surface instead of waiting out the timeout.
     it('rejects with a typed error on the generic ERROR_RES', async () => {
-        respondOnce(() =>
-            ProtoMessage.fromPartial({
-                payloadType: ProtoPayloadType.ERROR_RES,
-                payload: ProtoErrorRes.encode(ProtoErrorRes.fromPartial({ errorCode: 'FRAME_TOO_LONG' })).finish()
-            })
+        respondOnce(
+            () =>
+                ProtoMessage.fromPartial({
+                    payloadType: ProtoPayloadType.ERROR_RES,
+                    payload: ProtoErrorRes.encode(ProtoErrorRes.fromPartial({ errorCode: 'FRAME_TOO_LONG' })).finish()
+                }),
+            { echoClientMsgId: false }
         );
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
@@ -143,6 +152,40 @@ describe('SpotwareSocketAuthenticator', () => {
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
         await expect(authenticator.authenticateAccount(123, 'access-token')).resolves.toBeUndefined();
+    });
+
+    it('settles each of two overlapping handshakes from its own response', async () => {
+        const requests: ProtoMessage[] = [];
+        const decoder = new FrameDecoder();
+        serverSocket.on('data', (chunk: Buffer) => {
+            for (const frame of decoder.push(chunk)) {
+                requests.push(ProtoMessage.decode(frame));
+            }
+        });
+
+        const authenticator = new SpotwareSocketAuthenticator(transport, { responseTimeoutMs: 300 });
+        const abandoned = authenticator.authenticateApplication('client-id', 'client-secret');
+        const answered = authenticator.authenticateApplication('client-id', 'client-secret');
+
+        await vi.waitFor(() => expect(requests).toHaveLength(2));
+
+        // Reply to the second request only: the first must keep waiting rather than take
+        // someone else's response as its own, which is what makes it "authenticated" without
+        // the server ever having said so.
+        serverSocket.write(
+            encodeFrame(
+                ProtoMessage.encode(
+                    ProtoMessage.fromPartial({
+                        payloadType: ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES,
+                        payload: ProtoOAApplicationAuthRes.encode(ProtoOAApplicationAuthRes.fromPartial({})).finish(),
+                        clientMsgId: requests[1]?.clientMsgId
+                    })
+                ).finish()
+            )
+        );
+
+        await expect(answered).resolves.toBeUndefined();
+        await expect(abandoned).rejects.toThrow(/Timed out/);
     });
 
     it('times out when the server never responds', async () => {

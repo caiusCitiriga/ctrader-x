@@ -176,7 +176,7 @@ npm run start:trendbars     # fetch the last 24h of H1 bars for a symbol
 
 ## API Reference
 
-Everything below is exported from the package root (`import { ... } from 'ctrader-x'`). Classes with events expose `once()` and `off()` with the same signatures as `on()`. The generated Protobuf message and enum types (`ProtoOA...`, `Proto...` — roughly 300 of them) aren't listed individually; see [Types](#types) at the end.
+Everything below is exported from the package root (`import { ... } from 'ctrader-x'`). For a signatures-only cheat sheet, skip to [Quick reference](#quick-reference). Classes with events expose `once()` and `off()` with the same signatures as `on()`. The generated Protobuf message and enum types (`ProtoOA...`, `Proto...` — roughly 300 of them) aren't listed individually; see [Types](#types) at the end.
 
 ### Transport
 
@@ -445,6 +445,119 @@ Order mutations have no dedicated response message — the outcome arrives as a 
 ### Types
 
 Every Protobuf message and enum from Spotware's Open API — `ProtoOANewOrderReq`, `ProtoOATradeSide`, `ProtoOAExecutionEvent`, and roughly 300 more — is generated directly from the official `.proto` files (see [Regenerating protocol types](#regenerating-protocol-types)) and exported from the package root. They aren't listed individually here; each one carries its own field-level doc comments, visible in your editor.
+
+## Quick reference
+
+Everything the package exports, in one place, for when you already know the concepts and just need the signature. The [API Reference](#api-reference) above has the same material with the reasoning behind it.
+
+### Methods
+
+| Class | Member | Description |
+| --- | --- | --- |
+| `SpotwareTransport` | `connect(): Promise<void>` | Opens the connection. Rejects if the *first* attempt fails; later reconnects keep retrying. |
+| | `disconnect(): Promise<void>` | Intentional close — no auto-reconnect follows. |
+| | `send(message: ProtoMessage): Promise<void>` | Sends a raw framed message, rate-limited per Spotware's documented limits. |
+| `SpotwareOAuthClient` | `buildAuthorizationUrl({ redirectUri, scope }): string` | The URL to send the user to for browser authorization. |
+| | `exchangeAuthorizationCode({ code, redirectUri }): Promise<ISpotwareOAuthToken>` | Trades the redirect code for tokens. The code expires in ~1 minute. |
+| | `refreshAccessToken({ refreshToken }): Promise<ISpotwareOAuthToken>` | Refresh tokens are single-use — persist what comes back. |
+| `SpotwareSocketAuthenticator` | `authenticateApplication(clientId, clientSecret): Promise<void>` | `ApplicationAuthReq`. Once per connection. |
+| | `listAccounts(accessToken): Promise<ProtoOACtidTraderAccount[]>` | The only way to discover a `ctidTraderAccountId` from a bare access token. |
+| | `authenticateAccount(ctidTraderAccountId, accessToken): Promise<void>` | `AccountAuthReq`. Once per account. |
+| `SpotwareClient` | `readonly ctidTraderAccountId: number` | The account this client is bound to. |
+| | `connect(): Promise<void>` | Connects and completes the auth handshake. |
+| | `disconnect(): Promise<void>` | Closes the underlying transport. |
+| | `send(payloadType, payload): Promise<ProtoMessage>` | Correlated request. Rejects with `SpotwareRequestError` on error, timeout, or a drop mid-flight. |
+| `SpotwareMarketData` | `readonly symbols: SpotwareSymbolCatalog` | The catalog used to resolve names to ids. |
+| | `subscribe(symbol: number \| string): Promise<void>` | By `symbolId` or by name. Re-applied automatically after a reconnect. |
+| | `unsubscribe(symbol: number \| string): Promise<void>` | |
+| | `getTrendbars(params: IGetTrendbarsParams): Promise<ITrendbar[]>` | One-off historical fetch, not a subscription. Prices already converted. |
+| `SpotwareSymbolCatalog` | `getAll(): Promise<ProtoOALightSymbol[]>` | Cached after the first call. |
+| | `findByName(symbolName): Promise<ProtoOALightSymbol \| undefined>` | Case-insensitive. |
+| | `findById(symbolId): Promise<ProtoOALightSymbol \| undefined>` | |
+| | `refresh(): Promise<ProtoOALightSymbol[]>` | Forces a re-fetch of the list. |
+| | `getFullSymbol(symbolId): Promise<ProtoOASymbol \| undefined>` | Full spec — `lotSize`, volume bounds, `digits`, `pipPosition`. Cached per id. |
+| `SpotwareTrading` | `placeMarketOrder(params): Promise<ProtoOAExecutionEvent>` | |
+| | `placeLimitOrder(params): Promise<ProtoOAExecutionEvent>` | |
+| | `amendOrder(params): Promise<ProtoOAExecutionEvent>` | |
+| | `cancelOrder(orderId): Promise<ProtoOAExecutionEvent>` | |
+| | `closePosition(params): Promise<ProtoOAExecutionEvent>` | |
+| | `getOpenPositionsAndOrders(): Promise<IOpenPositionsAndOrders>` | |
+
+Constructors: `new SpotwareTransport(options)`, `new SpotwareOAuthClient({ clientId, clientSecret })`, `new SpotwareSocketAuthenticator(transport, options?)`, `new SpotwareClient(options)`, `new SpotwareMarketData(client, symbolCatalog?)`, `new SpotwareSymbolCatalog(client)`, `new SpotwareTrading(client)`.
+
+### Events
+
+Every emitter also exposes `once()` and `off()` with the same signatures as `on()`.
+
+| Class | Event | Listener arguments |
+| --- | --- | --- |
+| `SpotwareTransport` | `connected` | — |
+| | `disconnected` | `(reason: SpotwareDisconnectReason)` |
+| | `reconnecting` | `(attempt: number, delayMs: number)` |
+| | `message` | `(message: ProtoMessage)` |
+| | `error` | `(error: Error)` |
+| `SpotwareClient` | `authenticated` | — (fires again after every reconnect) |
+| | `tokenRefreshed` | `(token: ISpotwareOAuthToken)` — persist this |
+| | `message` | `(message: ProtoMessage)` — every message, correlated or not |
+| | `error` | `(error: Error)` — includes forwarded transport errors |
+| `SpotwareMarketData` | `price` | `(update: ISpotwarePriceUpdate)` |
+| | `error` | `(error: Error)` |
+
+Always attach an `'error'` listener: per Node's `EventEmitter` convention, an unlistened `'error'` event throws and crashes the process.
+
+### Interfaces
+
+| Interface | Shape |
+| --- | --- |
+| `ISpotwareTransportOptions` | `{ host, port?, reconnectBackoff?, socketFactory?, staleConnectionTimeoutMs? }` |
+| `ISpotwareClientOptions` | `{ transport, oauthClient, clientId, clientSecret, ctidTraderAccountId, token, requestTimeoutMs?, tokenRefreshBufferMs? }` |
+| `ISpotwareOAuthToken` | `{ accessToken, refreshToken, tokenType, expiresIn }` |
+| `IReconnectBackoffOptions` | `{ baseDelayMs, maxDelayMs, factor }` |
+| `ISpotwarePriceUpdate` | `{ symbolId, bid?, ask?, timestamp? }` — decimal prices, already unscaled |
+| `IGetTrendbarsParams` | `{ symbolId, period, fromTimestamp?, toTimestamp?, count? }` — timestamps in Unix ms |
+| `ITrendbar` | `{ period, timestamp?, open, high, low, close, volume }` |
+| `IPlaceMarketOrderParams` | `{ symbolId, tradeSide, volume, stopLoss?, takeProfit?, comment?, label? }` — volume in units |
+| `IPlaceLimitOrderParams` | `IPlaceMarketOrderParams` + `{ limitPrice, timeInForce?, expirationTimestamp? }` |
+| `IAmendOrderParams` | `{ orderId, volume?, limitPrice?, stopPrice?, stopLoss?, takeProfit?, expirationTimestamp? }` |
+| `IClosePositionParams` | `{ positionId, volume }` — volume in units |
+| `IOpenPositionsAndOrders` | `{ positions: ProtoOAPosition[], orders: ProtoOAOrder[] }` |
+
+### Constants, enums and types
+
+| Export | Value or shape |
+| --- | --- |
+| `SpotwareHost` | `enum { DEMO = 'demo.ctraderapi.com', LIVE = 'live.ctraderapi.com' }` |
+| `SpotwareOAuthScope` | `enum { ACCOUNTS = 'accounts', TRADING = 'trading' }` |
+| `SPOTWARE_PORT` | `5035` |
+| `SPOTWARE_PRICE_SCALE` | `100_000` |
+| `SPOTWARE_VOLUME_SCALE` | `100` |
+| `DEFAULT_RECONNECT_BACKOFF_OPTIONS` | `{ baseDelayMs: 500, maxDelayMs: 30_000, factor: 2 }` |
+| `calculateReconnectDelayMs(attempt, options?)` | Pure function — next backoff delay, with jitter. |
+| `SpotwareDisconnectReason` | `'manual' \| 'dropped'` |
+| `SpotwareSocketFactory` | `(port: number, host: string) => Promise<Duplex>` |
+
+### Errors
+
+All extend `Error`, so `instanceof` works.
+
+| Error | Extra fields | Thrown by |
+| --- | --- | --- |
+| `SpotwareOAuthError` | `errorCode?: string`, `httpStatus?: number` | `SpotwareOAuthClient` |
+| `SpotwareSocketAuthError` | `errorCode?: string` | `SpotwareSocketAuthenticator` |
+| `SpotwareRequestError` | `errorCode?: string` | `SpotwareClient.send()`, and everything built on it |
+
+### Defaults
+
+| Setting | Default | Set via |
+| --- | --- | --- |
+| Port | `5035` | `ISpotwareTransportOptions.port` |
+| Stale connection timeout | `30_000` ms | `ISpotwareTransportOptions.staleConnectionTimeoutMs` |
+| Reconnect backoff | `500` ms base, `30_000` ms cap, factor `2` | `ISpotwareTransportOptions.reconnectBackoff` |
+| Auth handshake timeout | `10_000` ms | `ISpotwareSocketAuthenticatorOptions.responseTimeoutMs` |
+| Request timeout | `10_000` ms | `ISpotwareClientOptions.requestTimeoutMs` |
+| Token refresh buffer | `300_000` ms (5 min before expiry) | `ISpotwareClientOptions.tokenRefreshBufferMs` |
+| Heartbeat interval | `10_000` ms | not configurable — Spotware requires at least one every 10s |
+| Rate limits | 5 req/s historical, 50 req/s everything else | not configurable — enforced automatically, per connection |
 
 ## Development
 
