@@ -1,4 +1,10 @@
-# CTrader-x
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/caiusCitiriga/ctrader-x/main/assets/ctrader-x-stacked.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/caiusCitiriga/ctrader-x/main/assets/ctrader-x-stacked-light.png">
+    <img src="https://raw.githubusercontent.com/caiusCitiriga/ctrader-x/main/assets/ctrader-x-stacked-light.png" alt="CTrader-X" width="320">
+  </picture>
+</p>
 
 A TypeScript SDK for cTrader's Open API — connect, authenticate, stream prices, and trade, with automatic reconnection built in.
 
