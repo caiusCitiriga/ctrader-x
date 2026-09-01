@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-09-02
+
+### Added
+
+- A GitHub Actions CI workflow (`.github/workflows/ci.yml`): on every push/PR to `main`, installs with `npm ci`, checks Prettier formatting, builds (`tsc`), and runs the test suite, across Node 18/20/22 to match the `engines` constraint. A CI badge was added to the README header.
+
+Tooling and documentation only — no code changes.
+
 ## [0.4.0] - 2026-09-01
 
 ### Added

@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/caiusCitiriga/ctrader-x/actions/workflows/ci.yml"><img src="https://github.com/caiusCitiriga/ctrader-x/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/npm/v/ctrader-x" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/npm/dm/ctrader-x" alt="npm downloads"></a>
   <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/node/v/ctrader-x" alt="node version"></a>
