@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-09-02
+
+### Fixed
+
+- **`vitest run` crashed on CI with `ERR_REQUIRE_ESM`, on Node 18.x and 20.x only.** `vitest.config.ts` has no `"type": "module"` in `package.json` to signal it, so Vitest loaded it as CommonJS via `require()` — but Vite 7 (Vitest 3's dependency) is ESM-only. Node 22.12+ can `require()` an ESM module natively, which is why this passed locally and was invisible until CI's Node 18/20 runners hit it. Renamed the config to `vitest.config.mts`, which forces Vite's config loader to treat it as ESM regardless of the package's module type. Verified with `vitest run` and `tsc` on Node 18.14.0, 20.14.0 and 22.19.0 via `nvm`.
+
 ## [0.4.1] - 2026-09-02
 
 ### Added
