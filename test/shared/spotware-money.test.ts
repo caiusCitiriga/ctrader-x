@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_MONEY_DIGITS, fromMoneyDigits } from '../../src/shared/spotware-money';
+import {
+    DEFAULT_MONEY_DIGITS,
+    fromMoneyDigits,
+} from '../../src/shared/spotware-money';
 
 describe('fromMoneyDigits', () => {
     it('applies the exponent the server reported', () => {

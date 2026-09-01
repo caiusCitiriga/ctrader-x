@@ -12,7 +12,7 @@ import {
     ProtoOAOrder,
     ProtoOAOrderListReq,
     ProtoOAOrderListRes,
-    ProtoOAPayloadType
+    ProtoOAPayloadType,
 } from '../types';
 
 /** A week, in milliseconds — the widest range cTrader accepts for a cash flow query. */
@@ -65,29 +65,38 @@ export class SpotwareHistory {
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             fromTimestamp: params.fromTimestamp,
             toTimestamp: params.toTimestamp,
-            maxRows: params.maxRows
+            maxRows: params.maxRows,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_DEAL_LIST_REQ, ProtoOADealListReq.encode(request).finish());
-        const decoded = ProtoOADealListRes.decode(response.payload ?? new Uint8Array());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_DEAL_LIST_REQ,
+            ProtoOADealListReq.encode(request).finish(),
+        );
+        const decoded = ProtoOADealListRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return { deals: decoded.deal, hasMore: decoded.hasMore };
     }
 
     /** Every deal belonging to one position — the fills that opened, added to, and closed it. */
-    async getDealsByPositionId(params: IGetDealsByPositionIdParams): Promise<IDealHistoryPage> {
+    async getDealsByPositionId(
+        params: IGetDealsByPositionIdParams,
+    ): Promise<IDealHistoryPage> {
         const request = ProtoOADealListByPositionIdReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             positionId: params.positionId,
             fromTimestamp: params.fromTimestamp,
-            toTimestamp: params.toTimestamp
+            toTimestamp: params.toTimestamp,
         });
 
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_DEAL_LIST_BY_POSITION_ID_REQ,
-            ProtoOADealListByPositionIdReq.encode(request).finish()
+            ProtoOADealListByPositionIdReq.encode(request).finish(),
         );
-        const decoded = ProtoOADealListByPositionIdRes.decode(response.payload ?? new Uint8Array());
+        const decoded = ProtoOADealListByPositionIdRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return { deals: decoded.deal, hasMore: decoded.hasMore };
     }
@@ -96,11 +105,16 @@ export class SpotwareHistory {
         const request = ProtoOAOrderListReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             fromTimestamp: params.fromTimestamp,
-            toTimestamp: params.toTimestamp
+            toTimestamp: params.toTimestamp,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_ORDER_LIST_REQ, ProtoOAOrderListReq.encode(request).finish());
-        const decoded = ProtoOAOrderListRes.decode(response.payload ?? new Uint8Array());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_ORDER_LIST_REQ,
+            ProtoOAOrderListReq.encode(request).finish(),
+        );
+        const decoded = ProtoOAOrderListRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return { orders: decoded.order, hasMore: decoded.hasMore };
     }
@@ -109,27 +123,41 @@ export class SpotwareHistory {
      * Deposits and withdrawals. cTrader caps the range at one week, so this rejects a wider one
      * up front rather than letting the server return a less obvious error.
      */
-    async getCashFlow(params: ITimeRangeParams): Promise<ProtoOADepositWithdraw[]> {
-        if (params.toTimestamp - params.fromTimestamp > MAX_CASH_FLOW_RANGE_MS) {
-            throw new RangeError(`Cash flow history covers at most one week per request (${MAX_CASH_FLOW_RANGE_MS} ms)`);
+    async getCashFlow(
+        params: ITimeRangeParams,
+    ): Promise<ProtoOADepositWithdraw[]> {
+        if (
+            params.toTimestamp - params.fromTimestamp >
+            MAX_CASH_FLOW_RANGE_MS
+        ) {
+            throw new RangeError(
+                `Cash flow history covers at most one week per request (${MAX_CASH_FLOW_RANGE_MS} ms)`,
+            );
         }
 
         const request = ProtoOACashFlowHistoryListReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             fromTimestamp: params.fromTimestamp,
-            toTimestamp: params.toTimestamp
+            toTimestamp: params.toTimestamp,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ, encodeCashFlowHistoryListReq(request));
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ,
+            encodeCashFlowHistoryListReq(request),
+        );
 
-        return ProtoOACashFlowHistoryListRes.decode(response.payload ?? new Uint8Array()).depositWithdraw;
+        return ProtoOACashFlowHistoryListRes.decode(
+            response.payload ?? new Uint8Array(),
+        ).depositWithdraw;
     }
 }
 
 // fromTimestamp (field 3) and toTimestamp (field 4) are required int64s, so ts-proto drops
 // either one set to 0 — and 0 is exactly what you pass for "since the beginning of time".
 // See appendRequiredInt64IfDropped.
-function encodeCashFlowHistoryListReq(request: ProtoOACashFlowHistoryListReq): Uint8Array {
+function encodeCashFlowHistoryListReq(
+    request: ProtoOACashFlowHistoryListReq,
+): Uint8Array {
     const writer = ProtoOACashFlowHistoryListReq.encode(request);
     appendRequiredInt64IfDropped(writer, 3, request.fromTimestamp);
     appendRequiredInt64IfDropped(writer, 4, request.toTimestamp);

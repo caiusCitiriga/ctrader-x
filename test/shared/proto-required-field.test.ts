@@ -10,7 +10,7 @@ import {
     ProtoOAGetTickDataRes,
     ProtoOAPayloadType,
     ProtoOAQuoteType,
-    ProtoOATrendbarPeriod
+    ProtoOATrendbarPeriod,
 } from '../../src/types';
 import { createTestClient } from './create-test-client';
 import { TEST_ACCOUNT_ID } from './fake-spotware-server';
@@ -56,7 +56,9 @@ describe('required proto2 fields at their implicit default', () => {
 
     beforeEach(async () => {
         server = net.createServer();
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise<void>((resolve) =>
+            server.listen(0, '127.0.0.1', resolve),
+        );
         port = (server.address() as net.AddressInfo).port;
         createdClients = [];
         sentRequests = [];
@@ -67,7 +69,9 @@ describe('required proto2 fields at their implicit default', () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
     });
 
-    function capture(respondWith?: (request: ProtoMessage) => ProtoMessage | undefined) {
+    function capture(
+        respondWith?: (request: ProtoMessage) => ProtoMessage | undefined,
+    ) {
         return (request: ProtoMessage): ProtoMessage | undefined => {
             sentRequests.push(request);
             return respondWith?.(request);
@@ -75,112 +79,151 @@ describe('required proto2 fields at their implicit default', () => {
     }
 
     function payloadOf(payloadType: number): Uint8Array {
-        const request = sentRequests.find((sent) => sent.payloadType === payloadType);
-        expect(request, `no request of payload type ${payloadType} was sent`).toBeDefined();
+        const request = sentRequests.find(
+            (sent) => sent.payloadType === payloadType,
+        );
+        expect(
+            request,
+            `no request of payload type ${payloadType} was sent`,
+        ).toBeDefined();
         return request?.payload ?? new Uint8Array();
     }
 
     it('keeps M1 on the wire when subscribing to live trendbars', async () => {
         const { client } = createTestClient(server, port, createdClients, {
-            onOtherRequest: capture()
+            onOtherRequest: capture(),
         });
         await client.connect();
         const marketData = new SpotwareMarketData(client);
 
         await marketData.subscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M1
+            period: ProtoOATrendbarPeriod.M1,
         });
 
-        const payload = payloadOf(ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ);
-        expect(containsByteSequence(payload, [PERIOD_FIELD_3_TAG, ProtoOATrendbarPeriod.M1])).toBe(true);
+        const payload = payloadOf(
+            ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ,
+        );
+        expect(
+            containsByteSequence(payload, [
+                PERIOD_FIELD_3_TAG,
+                ProtoOATrendbarPeriod.M1,
+            ]),
+        ).toBe(true);
     });
 
     it('keeps M1 on the wire when unsubscribing from live trendbars', async () => {
         const { client } = createTestClient(server, port, createdClients, {
-            onOtherRequest: capture()
+            onOtherRequest: capture(),
         });
         await client.connect();
         const marketData = new SpotwareMarketData(client);
 
         await marketData.unsubscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M1
+            period: ProtoOATrendbarPeriod.M1,
         });
 
-        const payload = payloadOf(ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ);
-        expect(containsByteSequence(payload, [PERIOD_FIELD_3_TAG, ProtoOATrendbarPeriod.M1])).toBe(true);
+        const payload = payloadOf(
+            ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ,
+        );
+        expect(
+            containsByteSequence(payload, [
+                PERIOD_FIELD_3_TAG,
+                ProtoOATrendbarPeriod.M1,
+            ]),
+        ).toBe(true);
     });
 
     it('writes a non-default period exactly once', async () => {
         const { client } = createTestClient(server, port, createdClients, {
-            onOtherRequest: capture()
+            onOtherRequest: capture(),
         });
         await client.connect();
         const marketData = new SpotwareMarketData(client);
 
         await marketData.subscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M5
+            period: ProtoOATrendbarPeriod.M5,
         });
 
-        const payload = payloadOf(ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ);
-        expect(countByteSequence(payload, [PERIOD_FIELD_3_TAG, ProtoOATrendbarPeriod.M5])).toBe(1);
+        const payload = payloadOf(
+            ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ,
+        );
+        expect(
+            countByteSequence(payload, [
+                PERIOD_FIELD_3_TAG,
+                ProtoOATrendbarPeriod.M5,
+            ]),
+        ).toBe(1);
     });
 
     it('keeps BID on the wire when requesting tick data', async () => {
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: capture((request) =>
-                request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ
+                request.payloadType ===
+                ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ
                     ? ProtoMessage.fromPartial({
-                          payloadType: ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_RES,
+                          payloadType:
+                              ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_RES,
                           payload: ProtoOAGetTickDataRes.encode(
                               ProtoOAGetTickDataRes.fromPartial({
                                   ctidTraderAccountId: TEST_ACCOUNT_ID,
                                   tickData: [],
-                                  hasMore: false
-                              })
+                                  hasMore: false,
+                              }),
                           ).finish(),
-                          clientMsgId: request.clientMsgId
+                          clientMsgId: request.clientMsgId,
                       })
-                    : undefined
-            )
+                    : undefined,
+            ),
         });
         await client.connect();
         const marketData = new SpotwareMarketData(client);
 
         await marketData.getTickData({
             symbolId: 1,
-            type: ProtoOAQuoteType.BID
+            type: ProtoOAQuoteType.BID,
         });
 
         const payload = payloadOf(ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ);
-        expect(containsByteSequence(payload, [TYPE_FIELD_4_TAG, ProtoOAQuoteType.BID])).toBe(true);
+        expect(
+            containsByteSequence(payload, [
+                TYPE_FIELD_4_TAG,
+                ProtoOAQuoteType.BID,
+            ]),
+        ).toBe(true);
     });
 
     it('keeps a zero fromTimestamp on the wire for cash flow history', async () => {
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: capture((request) =>
-                request.payloadType === ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ
+                request.payloadType ===
+                ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ
                     ? ProtoMessage.fromPartial({
-                          payloadType: ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_RES,
+                          payloadType:
+                              ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_RES,
                           payload: ProtoOACashFlowHistoryListRes.encode(
                               ProtoOACashFlowHistoryListRes.fromPartial({
                                   ctidTraderAccountId: TEST_ACCOUNT_ID,
-                                  depositWithdraw: []
-                              })
+                                  depositWithdraw: [],
+                              }),
                           ).finish(),
-                          clientMsgId: request.clientMsgId
+                          clientMsgId: request.clientMsgId,
                       })
-                    : undefined
-            )
+                    : undefined,
+            ),
         });
         await client.connect();
         const history = new SpotwareHistory(client);
 
         await history.getCashFlow({ fromTimestamp: 0, toTimestamp: 1_000 });
 
-        const payload = payloadOf(ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ);
-        expect(containsByteSequence(payload, [FROM_TIMESTAMP_FIELD_3_TAG, 0x00])).toBe(true);
+        const payload = payloadOf(
+            ProtoOAPayloadType.PROTO_OA_CASH_FLOW_HISTORY_LIST_REQ,
+        );
+        expect(
+            containsByteSequence(payload, [FROM_TIMESTAMP_FIELD_3_TAG, 0x00]),
+        ).toBe(true);
     });
 });

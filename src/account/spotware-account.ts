@@ -1,7 +1,10 @@
 import { SpotwareRequestError, type SpotwareClient } from '../client';
 import { fromMoneyDigits } from '../shared/spotware-money';
 import { SPOTWARE_VOLUME_SCALE } from '../shared/spotware-scale';
-import { TypedEventEmitter, type EventMap } from '../shared/typed-event-emitter';
+import {
+    TypedEventEmitter,
+    type EventMap,
+} from '../shared/typed-event-emitter';
 import {
     ProtoMessage,
     ProtoOAAccountsTokenInvalidatedEvent,
@@ -22,7 +25,7 @@ import {
     ProtoOATrader,
     ProtoOATraderReq,
     ProtoOATraderRes,
-    ProtoOATraderUpdatedEvent
+    ProtoOATraderUpdatedEvent,
 } from '../types';
 
 export interface IExpectedMargin {
@@ -92,16 +95,23 @@ export class SpotwareAccount extends TypedEventEmitter<ISpotwareAccountEvents> {
     /** The full account record, with monetary fields left in their raw scaled form. */
     async getTrader(): Promise<ProtoOATrader> {
         const request = ProtoOATraderReq.fromPartial({
-            ctidTraderAccountId: this.client.ctidTraderAccountId
+            ctidTraderAccountId: this.client.ctidTraderAccountId,
         });
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_TRADER_REQ, ProtoOATraderReq.encode(request).finish());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_TRADER_REQ,
+            ProtoOATraderReq.encode(request).finish(),
+        );
 
-        const trader = ProtoOATraderRes.decode(response.payload ?? new Uint8Array()).trader;
+        const trader = ProtoOATraderRes.decode(
+            response.payload ?? new Uint8Array(),
+        ).trader;
         // `trader` is proto2-required, but ts-proto's useOptionals=messages types every nested
         // message as optional. A response without it is malformed rather than a normal absence,
         // so failing here beats handing back an undefined every caller would have to check.
         if (!trader) {
-            throw new SpotwareRequestError('The trader response carried no account details');
+            throw new SpotwareRequestError(
+                'The trader response carried no account details',
+            );
         }
 
         return trader;
@@ -116,61 +126,81 @@ export class SpotwareAccount extends TypedEventEmitter<ISpotwareAccountEvents> {
 
     async getAssets(): Promise<ProtoOAAsset[]> {
         const request = ProtoOAAssetListReq.fromPartial({
-            ctidTraderAccountId: this.client.ctidTraderAccountId
+            ctidTraderAccountId: this.client.ctidTraderAccountId,
         });
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_ASSET_LIST_REQ, ProtoOAAssetListReq.encode(request).finish());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_ASSET_LIST_REQ,
+            ProtoOAAssetListReq.encode(request).finish(),
+        );
 
-        return ProtoOAAssetListRes.decode(response.payload ?? new Uint8Array()).asset;
+        return ProtoOAAssetListRes.decode(response.payload ?? new Uint8Array())
+            .asset;
     }
 
     /** Margin required to open the given volumes, before actually placing anything. */
-    async getExpectedMargin(params: IGetExpectedMarginParams): Promise<IExpectedMargin[]> {
+    async getExpectedMargin(
+        params: IGetExpectedMarginParams,
+    ): Promise<IExpectedMargin[]> {
         const request = ProtoOAExpectedMarginReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             symbolId: params.symbolId,
-            volume: params.volumes.map((volume) => volume * SPOTWARE_VOLUME_SCALE)
+            volume: params.volumes.map(
+                (volume) => volume * SPOTWARE_VOLUME_SCALE,
+            ),
         });
 
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_EXPECTED_MARGIN_REQ,
-            ProtoOAExpectedMarginReq.encode(request).finish()
+            ProtoOAExpectedMarginReq.encode(request).finish(),
         );
-        const decoded = ProtoOAExpectedMarginRes.decode(response.payload ?? new Uint8Array());
+        const decoded = ProtoOAExpectedMarginRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return decoded.margin.map((margin) => ({
             volume: margin.volume / SPOTWARE_VOLUME_SCALE,
             buyMargin: fromMoneyDigits(margin.buyMargin, decoded.moneyDigits),
-            sellMargin: fromMoneyDigits(margin.sellMargin, decoded.moneyDigits)
+            sellMargin: fromMoneyDigits(margin.sellMargin, decoded.moneyDigits),
         }));
     }
 
     async getPositionsUnrealizedPnL(): Promise<IPositionUnrealizedPnL[]> {
         const request = ProtoOAGetPositionUnrealizedPnLReq.fromPartial({
-            ctidTraderAccountId: this.client.ctidTraderAccountId
+            ctidTraderAccountId: this.client.ctidTraderAccountId,
         });
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQ,
-            ProtoOAGetPositionUnrealizedPnLReq.encode(request).finish()
+            ProtoOAGetPositionUnrealizedPnLReq.encode(request).finish(),
         );
-        const decoded = ProtoOAGetPositionUnrealizedPnLRes.decode(response.payload ?? new Uint8Array());
+        const decoded = ProtoOAGetPositionUnrealizedPnLRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return decoded.positionUnrealizedPnL.map((pnl) => ({
             positionId: pnl.positionId,
-            grossUnrealizedPnL: fromMoneyDigits(pnl.grossUnrealizedPnL, decoded.moneyDigits),
-            netUnrealizedPnL: fromMoneyDigits(pnl.netUnrealizedPnL, decoded.moneyDigits)
+            grossUnrealizedPnL: fromMoneyDigits(
+                pnl.grossUnrealizedPnL,
+                decoded.moneyDigits,
+            ),
+            netUnrealizedPnL: fromMoneyDigits(
+                pnl.netUnrealizedPnL,
+                decoded.moneyDigits,
+            ),
         }));
     }
 
     async getMarginCalls(): Promise<ProtoOAMarginCall[]> {
         const request = ProtoOAMarginCallListReq.fromPartial({
-            ctidTraderAccountId: this.client.ctidTraderAccountId
+            ctidTraderAccountId: this.client.ctidTraderAccountId,
         });
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_MARGIN_CALL_LIST_REQ,
-            ProtoOAMarginCallListReq.encode(request).finish()
+            ProtoOAMarginCallListReq.encode(request).finish(),
         );
 
-        return ProtoOAMarginCallListRes.decode(response.payload ?? new Uint8Array()).marginCall;
+        return ProtoOAMarginCallListRes.decode(
+            response.payload ?? new Uint8Array(),
+        ).marginCall;
     }
 
     private handleMessage(message: ProtoMessage): void {
@@ -188,19 +218,24 @@ export class SpotwareAccount extends TypedEventEmitter<ISpotwareAccountEvents> {
                 const event = ProtoOAMarginChangedEvent.decode(payload);
                 this.emit('marginChanged', {
                     positionId: event.positionId,
-                    usedMargin: fromMoneyDigits(event.usedMargin, event.moneyDigits)
+                    usedMargin: fromMoneyDigits(
+                        event.usedMargin,
+                        event.moneyDigits,
+                    ),
                 });
                 return;
             }
             case ProtoOAPayloadType.PROTO_OA_MARGIN_CALL_TRIGGER_EVENT: {
-                const marginCall = ProtoOAMarginCallTriggerEvent.decode(payload).marginCall;
+                const marginCall =
+                    ProtoOAMarginCallTriggerEvent.decode(payload).marginCall;
                 if (marginCall) {
                     this.emit('marginCallTriggered', marginCall);
                 }
                 return;
             }
             case ProtoOAPayloadType.PROTO_OA_MARGIN_CALL_UPDATE_EVENT: {
-                const marginCall = ProtoOAMarginCallUpdateEvent.decode(payload).marginCall;
+                const marginCall =
+                    ProtoOAMarginCallUpdateEvent.decode(payload).marginCall;
                 if (marginCall) {
                     this.emit('marginCallUpdated', marginCall);
                 }
@@ -210,8 +245,13 @@ export class SpotwareAccount extends TypedEventEmitter<ISpotwareAccountEvents> {
                 this.emit('accountDisconnected');
                 return;
             case ProtoOAPayloadType.PROTO_OA_ACCOUNTS_TOKEN_INVALIDATED_EVENT: {
-                const event = ProtoOAAccountsTokenInvalidatedEvent.decode(payload);
-                this.emit('tokenInvalidated', event.ctidTraderAccountIds, event.reason);
+                const event =
+                    ProtoOAAccountsTokenInvalidatedEvent.decode(payload);
+                this.emit(
+                    'tokenInvalidated',
+                    event.ctidTraderAccountIds,
+                    event.reason,
+                );
                 return;
             }
             default:

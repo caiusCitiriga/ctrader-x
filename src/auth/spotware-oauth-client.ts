@@ -1,4 +1,7 @@
-import { SPOTWARE_OAUTH_AUTHORIZE_URL, SPOTWARE_OAUTH_TOKEN_URL } from './spotware-oauth-endpoints';
+import {
+    SPOTWARE_OAUTH_AUTHORIZE_URL,
+    SPOTWARE_OAUTH_TOKEN_URL,
+} from './spotware-oauth-endpoints';
 import { SpotwareOAuthError } from './spotware-oauth-error';
 import { SpotwareOAuthScope } from './spotware-oauth-scope.enum';
 import type { ISpotwareOAuthToken } from './spotware-oauth-token.model';
@@ -39,7 +42,10 @@ interface ISpotwareTokenResponsePayload {
 export class SpotwareOAuthClient {
     constructor(private readonly options: ISpotwareOAuthClientOptions) {}
 
-    buildAuthorizationUrl({ redirectUri, scope }: IBuildAuthorizationUrlParams): string {
+    buildAuthorizationUrl({
+        redirectUri,
+        scope,
+    }: IBuildAuthorizationUrlParams): string {
         const url = new URL(SPOTWARE_OAUTH_AUTHORIZE_URL);
         url.searchParams.set('client_id', this.options.clientId);
         url.searchParams.set('redirect_uri', redirectUri);
@@ -48,24 +54,31 @@ export class SpotwareOAuthClient {
         return url.toString();
     }
 
-    exchangeAuthorizationCode({ code, redirectUri }: IExchangeAuthorizationCodeParams): Promise<ISpotwareOAuthToken> {
+    exchangeAuthorizationCode({
+        code,
+        redirectUri,
+    }: IExchangeAuthorizationCodeParams): Promise<ISpotwareOAuthToken> {
         return this.requestToken({
             grant_type: 'authorization_code',
             code,
-            redirect_uri: redirectUri
+            redirect_uri: redirectUri,
         });
     }
 
-    refreshAccessToken({ refreshToken }: IRefreshAccessTokenParams): Promise<ISpotwareOAuthToken> {
+    refreshAccessToken({
+        refreshToken,
+    }: IRefreshAccessTokenParams): Promise<ISpotwareOAuthToken> {
         return this.requestToken({
             grant_type: 'refresh_token',
-            refresh_token: refreshToken
+            refresh_token: refreshToken,
         });
     }
 
     // Spotware's token endpoint takes these as GET query params, client_secret included,
     // matching their own SDKs. Not our choice of contract, just theirs to interop with.
-    private async requestToken(params: Record<string, string>): Promise<ISpotwareOAuthToken> {
+    private async requestToken(
+        params: Record<string, string>,
+    ): Promise<ISpotwareOAuthToken> {
         const url = new URL(SPOTWARE_OAUTH_TOKEN_URL);
         for (const [key, value] of Object.entries(params)) {
             url.searchParams.set(key, value);
@@ -77,16 +90,20 @@ export class SpotwareOAuthClient {
         try {
             response = await fetch(url);
         } catch (error) {
-            throw new SpotwareOAuthError(`Failed to reach the Spotware token endpoint: ${(error as Error).message}`);
+            throw new SpotwareOAuthError(
+                `Failed to reach the Spotware token endpoint: ${(error as Error).message}`,
+            );
         }
 
-        const payload = (await response.json()) as ISpotwareTokenResponsePayload;
+        const payload =
+            (await response.json()) as ISpotwareTokenResponsePayload;
 
         if (!response.ok || !payload.accessToken || !payload.refreshToken) {
             throw new SpotwareOAuthError(
-                payload.description ?? `Spotware token request failed with HTTP ${response.status}`,
+                payload.description ??
+                    `Spotware token request failed with HTTP ${response.status}`,
                 payload.errorCode,
-                response.status
+                response.status,
             );
         }
 
@@ -94,7 +111,7 @@ export class SpotwareOAuthClient {
             accessToken: payload.accessToken,
             refreshToken: payload.refreshToken,
             tokenType: payload.tokenType ?? 'bearer',
-            expiresIn: payload.expiresIn ?? 0
+            expiresIn: payload.expiresIn ?? 0,
         };
     }
 }

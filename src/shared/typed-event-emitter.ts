@@ -9,22 +9,34 @@ export type EventMap = Record<string, unknown[]>;
 export class TypedEventEmitter<TEvents extends EventMap> {
     private readonly emitter = new EventEmitter();
 
-    on<TEvent extends keyof TEvents & string>(event: TEvent, listener: (...args: TEvents[TEvent]) => void): this {
+    on<TEvent extends keyof TEvents & string>(
+        event: TEvent,
+        listener: (...args: TEvents[TEvent]) => void,
+    ): this {
         this.emitter.on(event, listener as (...args: unknown[]) => void);
         return this;
     }
 
-    once<TEvent extends keyof TEvents & string>(event: TEvent, listener: (...args: TEvents[TEvent]) => void): this {
+    once<TEvent extends keyof TEvents & string>(
+        event: TEvent,
+        listener: (...args: TEvents[TEvent]) => void,
+    ): this {
         this.emitter.once(event, listener as (...args: unknown[]) => void);
         return this;
     }
 
-    off<TEvent extends keyof TEvents & string>(event: TEvent, listener: (...args: TEvents[TEvent]) => void): this {
+    off<TEvent extends keyof TEvents & string>(
+        event: TEvent,
+        listener: (...args: TEvents[TEvent]) => void,
+    ): this {
         this.emitter.off(event, listener as (...args: unknown[]) => void);
         return this;
     }
 
-    protected emit<TEvent extends keyof TEvents & string>(event: TEvent, ...args: TEvents[TEvent]): boolean {
+    protected emit<TEvent extends keyof TEvents & string>(
+        event: TEvent,
+        ...args: TEvents[TEvent]
+    ): boolean {
         return this.emitter.emit(event, ...args);
     }
 }

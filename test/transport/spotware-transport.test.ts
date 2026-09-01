@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProtoMessage, ProtoPayloadType } from '../../src/types';
 import { encodeFrame, FrameDecoder } from '../../src/transport/frame-codec';
-import { SpotwareHost, SpotwareTransport, type SpotwareSocketFactory } from '../../src/transport';
+import {
+    SpotwareHost,
+    SpotwareTransport,
+    type SpotwareSocketFactory,
+} from '../../src/transport';
 
 function createLoopbackSocketFactory(port: number): SpotwareSocketFactory {
     return () =>
@@ -20,7 +24,9 @@ describe('SpotwareTransport', () => {
 
     beforeEach(async () => {
         server = net.createServer();
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise<void>((resolve) =>
+            server.listen(0, '127.0.0.1', resolve),
+        );
         port = (server.address() as net.AddressInfo).port;
     });
 
@@ -32,14 +38,15 @@ describe('SpotwareTransport', () => {
         overrides: {
             socketFactory?: SpotwareSocketFactory;
             staleConnectionTimeoutMs?: number;
-        } = {}
+        } = {},
     ): SpotwareTransport {
         return new SpotwareTransport({
             host: SpotwareHost.DEMO,
             port,
-            socketFactory: overrides.socketFactory ?? createLoopbackSocketFactory(port),
+            socketFactory:
+                overrides.socketFactory ?? createLoopbackSocketFactory(port),
             reconnectBackoff: { baseDelayMs: 10, maxDelayMs: 20, factor: 2 },
-            staleConnectionTimeoutMs: overrides.staleConnectionTimeoutMs
+            staleConnectionTimeoutMs: overrides.staleConnectionTimeoutMs,
         });
     }
 
@@ -73,8 +80,8 @@ describe('SpotwareTransport', () => {
         await transport.send(
             ProtoMessage.fromPartial({
                 payloadType: ProtoPayloadType.HEARTBEAT_EVENT,
-                clientMsgId: 'test-1'
-            })
+                clientMsgId: 'test-1',
+            }),
         );
 
         const decoded = ProtoMessage.decode(await received);
@@ -85,17 +92,21 @@ describe('SpotwareTransport', () => {
     });
 
     it('emits "message" for frames pushed by the server', async () => {
-        const connectionReceived = new Promise<net.Socket>((resolve) => server.once('connection', resolve));
+        const connectionReceived = new Promise<net.Socket>((resolve) =>
+            server.once('connection', resolve),
+        );
 
         const transport = createTransport();
-        const messageReceived = new Promise<ProtoMessage>((resolve) => transport.once('message', resolve));
+        const messageReceived = new Promise<ProtoMessage>((resolve) =>
+            transport.once('message', resolve),
+        );
 
         await transport.connect();
         const serverSocket = await connectionReceived;
 
         const outbound = ProtoMessage.fromPartial({
             payloadType: ProtoPayloadType.PROTO_MESSAGE,
-            clientMsgId: 'from-server'
+            clientMsgId: 'from-server',
         });
         serverSocket.write(encodeFrame(ProtoMessage.encode(outbound).finish()));
 
@@ -120,7 +131,10 @@ describe('SpotwareTransport', () => {
     });
 
     it('auto-reconnects with backoff after an unexpected drop, and recovers', async () => {
-        const nextServerConnection = () => new Promise<net.Socket>((resolve) => server.once('connection', resolve));
+        const nextServerConnection = () =>
+            new Promise<net.Socket>((resolve) =>
+                server.once('connection', resolve),
+            );
         const firstServerConnection = nextServerConnection();
 
         const transport = createTransport();
@@ -140,7 +154,7 @@ describe('SpotwareTransport', () => {
         serverSocket.destroy();
 
         await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
-            timeout: 2000
+            timeout: 2000,
         });
 
         expect(disconnected).toHaveBeenCalledWith('dropped');
@@ -155,13 +169,15 @@ describe('SpotwareTransport', () => {
         };
 
         const transport = createTransport({
-            socketFactory: alwaysFailingFactory
+            socketFactory: alwaysFailingFactory,
         });
         const reconnecting = vi.fn();
         transport.on('reconnecting', reconnecting);
         transport.on('error', () => undefined);
 
-        await expect(transport.connect()).rejects.toThrow('simulated DNS failure');
+        await expect(transport.connect()).rejects.toThrow(
+            'simulated DNS failure',
+        );
 
         // Give any stray reconnect scheduling a chance to fire, if this guard were broken.
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -172,7 +188,10 @@ describe('SpotwareTransport', () => {
         // Regression test: a real socketFactory rejection (e.g. tls.connect failing on
         // getaddrinfo ENOTFOUND during an outage) has no socket to ever emit 'close' on, which
         // previously caused the retry loop to silently stop after exactly one failed attempt.
-        const nextServerConnection = () => new Promise<net.Socket>((resolve) => server.once('connection', resolve));
+        const nextServerConnection = () =>
+            new Promise<net.Socket>((resolve) =>
+                server.once('connection', resolve),
+            );
         const firstServerConnection = nextServerConnection();
 
         const realFactory = createLoopbackSocketFactory(port);
@@ -202,7 +221,7 @@ describe('SpotwareTransport', () => {
         await secondServerConnection;
 
         await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
-            timeout: 3000
+            timeout: 3000,
         });
         // 3 reconnect attempts scheduled: the 2 that failed, plus the 1 that finally succeeded.
         expect(reconnecting.mock.calls.length).toBeGreaterThanOrEqual(3);
@@ -213,7 +232,10 @@ describe('SpotwareTransport', () => {
     it('force-reconnects when the connection goes silent, even with no socket-level close or error', async () => {
         // Simulates a network outage: the server neither sends anything nor closes the
         // socket, so nothing at the TCP layer would ever notice on its own.
-        const nextServerConnection = () => new Promise<net.Socket>((resolve) => server.once('connection', resolve));
+        const nextServerConnection = () =>
+            new Promise<net.Socket>((resolve) =>
+                server.once('connection', resolve),
+            );
         const firstServerConnection = nextServerConnection();
 
         const transport = createTransport({ staleConnectionTimeoutMs: 100 });
@@ -227,7 +249,7 @@ describe('SpotwareTransport', () => {
         await firstServerConnection;
 
         await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
-            timeout: 2000
+            timeout: 2000,
         });
         expect(reconnecting).toHaveBeenCalledTimes(1);
 
@@ -239,7 +261,8 @@ describe('SpotwareTransport', () => {
         const transport = new SpotwareTransport({
             host: SpotwareHost.DEMO,
             port,
-            socketFactory: () => new Promise<net.Socket>((resolve) => (releaseSocket = resolve))
+            socketFactory: () =>
+                new Promise<net.Socket>((resolve) => (releaseSocket = resolve)),
         });
         transport.on('error', () => undefined);
 
@@ -250,7 +273,9 @@ describe('SpotwareTransport', () => {
         await transport.disconnect();
 
         const socket = net.connect(port, '127.0.0.1');
-        await new Promise<void>((resolve) => socket.once('connect', () => resolve()));
+        await new Promise<void>((resolve) =>
+            socket.once('connect', () => resolve()),
+        );
         releaseSocket?.(socket);
         await connecting;
 

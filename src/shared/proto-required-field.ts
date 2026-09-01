@@ -13,14 +13,23 @@ const VARINT_WIRE_TYPE = 0;
  * meaning on the wire — and avoids hand-editing generated code that gets overwritten on every
  * `npm run generate:types`.
  */
-export function appendRequiredEnumIfDropped(writer: BinaryWriter, fieldNumber: number, value: number, implicitDefault: number): void {
+export function appendRequiredEnumIfDropped(
+    writer: BinaryWriter,
+    fieldNumber: number,
+    value: number,
+    implicitDefault: number,
+): void {
     if (value === implicitDefault) {
         writer.uint32(tagFor(fieldNumber)).int32(value);
     }
 }
 
 /** The int64 counterpart of {@link appendRequiredEnumIfDropped}; numeric fields default to 0. */
-export function appendRequiredInt64IfDropped(writer: BinaryWriter, fieldNumber: number, value: number | undefined): void {
+export function appendRequiredInt64IfDropped(
+    writer: BinaryWriter,
+    fieldNumber: number,
+    value: number | undefined,
+): void {
     if (value === 0) {
         writer.uint32(tagFor(fieldNumber)).int64(value);
     }

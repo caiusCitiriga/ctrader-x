@@ -6,7 +6,7 @@ import {
     ProtoOASymbolByIdReq,
     ProtoOASymbolByIdRes,
     ProtoOASymbolsListReq,
-    ProtoOASymbolsListRes
+    ProtoOASymbolsListRes,
 } from '../types';
 
 /**
@@ -17,7 +17,10 @@ import {
  */
 export class SpotwareSymbolCatalog {
     private symbolsPromise: Promise<ProtoOALightSymbol[]> | undefined;
-    private readonly fullSymbolPromises = new Map<number, Promise<ProtoOASymbol | undefined>>();
+    private readonly fullSymbolPromises = new Map<
+        number,
+        Promise<ProtoOASymbol | undefined>
+    >();
 
     constructor(private readonly client: SpotwareClient) {}
 
@@ -29,11 +32,15 @@ export class SpotwareSymbolCatalog {
         return this.symbolsPromise;
     }
 
-    async findByName(symbolName: string): Promise<ProtoOALightSymbol | undefined> {
+    async findByName(
+        symbolName: string,
+    ): Promise<ProtoOALightSymbol | undefined> {
         const normalized = symbolName.trim().toUpperCase();
         const symbols = await this.getAll();
 
-        return symbols.find((symbol) => symbol.symbolName?.toUpperCase() === normalized);
+        return symbols.find(
+            (symbol) => symbol.symbolName?.toUpperCase() === normalized,
+        );
     }
 
     async findById(symbolId: number): Promise<ProtoOALightSymbol | undefined> {
@@ -67,13 +74,17 @@ export class SpotwareSymbolCatalog {
 
     private async fetchSymbols(): Promise<ProtoOALightSymbol[]> {
         try {
-            const request = ProtoOASymbolsListReq.fromPartial({ ctidTraderAccountId: this.client.ctidTraderAccountId });
+            const request = ProtoOASymbolsListReq.fromPartial({
+                ctidTraderAccountId: this.client.ctidTraderAccountId,
+            });
             const response = await this.client.send(
                 ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ,
-                ProtoOASymbolsListReq.encode(request).finish()
+                ProtoOASymbolsListReq.encode(request).finish(),
             );
 
-            return ProtoOASymbolsListRes.decode(response.payload ?? new Uint8Array()).symbol;
+            return ProtoOASymbolsListRes.decode(
+                response.payload ?? new Uint8Array(),
+            ).symbol;
         } catch (error) {
             // Don't cache a failure — the next call should retry instead of returning a
             // permanently broken rejected promise.
@@ -82,12 +93,22 @@ export class SpotwareSymbolCatalog {
         }
     }
 
-    private async fetchFullSymbol(symbolId: number): Promise<ProtoOASymbol | undefined> {
+    private async fetchFullSymbol(
+        symbolId: number,
+    ): Promise<ProtoOASymbol | undefined> {
         try {
-            const request = ProtoOASymbolByIdReq.fromPartial({ ctidTraderAccountId: this.client.ctidTraderAccountId, symbolId: [symbolId] });
-            const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_SYMBOL_BY_ID_REQ, ProtoOASymbolByIdReq.encode(request).finish());
+            const request = ProtoOASymbolByIdReq.fromPartial({
+                ctidTraderAccountId: this.client.ctidTraderAccountId,
+                symbolId: [symbolId],
+            });
+            const response = await this.client.send(
+                ProtoOAPayloadType.PROTO_OA_SYMBOL_BY_ID_REQ,
+                ProtoOASymbolByIdReq.encode(request).finish(),
+            );
 
-            return ProtoOASymbolByIdRes.decode(response.payload ?? new Uint8Array()).symbol.find((symbol) => symbol.symbolId === symbolId);
+            return ProtoOASymbolByIdRes.decode(
+                response.payload ?? new Uint8Array(),
+            ).symbol.find((symbol) => symbol.symbolId === symbolId);
         } catch (error) {
             this.fullSymbolPromises.delete(symbolId);
             throw error;

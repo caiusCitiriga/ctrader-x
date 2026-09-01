@@ -18,7 +18,9 @@ describe('frame-codec', () => {
         const second = Buffer.from('second-payload');
         const decoder = new FrameDecoder();
 
-        const frames = decoder.push(Buffer.concat([encodeFrame(first), encodeFrame(second)]));
+        const frames = decoder.push(
+            Buffer.concat([encodeFrame(first), encodeFrame(second)]),
+        );
 
         expect(frames).toHaveLength(2);
         expect(frames[0]).toEqual(first);
@@ -26,7 +28,9 @@ describe('frame-codec', () => {
     });
 
     it('reassembles a frame split across arbitrary chunk boundaries, byte by byte', () => {
-        const payload = Buffer.from('a not-so-short payload spanning many chunks');
+        const payload = Buffer.from(
+            'a not-so-short payload spanning many chunks',
+        );
         const encoded = encodeFrame(payload);
         const decoder = new FrameDecoder();
 

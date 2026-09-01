@@ -2,7 +2,12 @@ import * as net from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpotwareClient } from '../../src/client';
-import { SpotwareMarketData, type IDepthUpdate, type ISpotwarePriceUpdate, type ITrendbar } from '../../src/market-data/spotware-market-data';
+import {
+    SpotwareMarketData,
+    type IDepthUpdate,
+    type ISpotwarePriceUpdate,
+    type ITrendbar,
+} from '../../src/market-data/spotware-market-data';
 import { encodeFrame } from '../../src/transport/frame-codec';
 import {
     ProtoMessage,
@@ -17,7 +22,7 @@ import {
     ProtoOASubscribeLiveTrendbarReq,
     ProtoOASubscribeSpotsReq,
     ProtoOATrendbar,
-    ProtoOATrendbarPeriod
+    ProtoOATrendbarPeriod,
 } from '../../src/types';
 import { createTestClient } from '../shared/create-test-client';
 import { TEST_ACCOUNT_ID } from '../shared/fake-spotware-server';
@@ -41,13 +46,19 @@ describe('SpotwareMarketData', () => {
 
     beforeEach(async () => {
         server = net.createServer();
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise<void>((resolve) =>
+            server.listen(0, '127.0.0.1', resolve),
+        );
         port = (server.address() as net.AddressInfo).port;
         createdClients = [];
     });
 
     afterEach(async () => {
-        await Promise.all(createdClients.map((client) => client.disconnect().catch(() => undefined)));
+        await Promise.all(
+            createdClients.map((client) =>
+                client.disconnect().catch(() => undefined),
+            ),
+        );
         await new Promise<void>((resolve) => server.close(() => resolve()));
     });
 
@@ -55,11 +66,18 @@ describe('SpotwareMarketData', () => {
         const subscribeRequests: ProtoOASubscribeSpotsReq[] = [];
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    subscribeRequests.push(ProtoOASubscribeSpotsReq.decode(request.payload ?? new Uint8Array()));
+                if (
+                    request.payloadType ===
+                    ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                ) {
+                    subscribeRequests.push(
+                        ProtoOASubscribeSpotsReq.decode(
+                            request.payload ?? new Uint8Array(),
+                        ),
+                    );
                 }
                 return undefined;
-            }
+            },
         });
         await client.connect();
 
@@ -74,11 +92,18 @@ describe('SpotwareMarketData', () => {
         const subscribeRequests: ProtoOASubscribeSpotsReq[] = [];
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    subscribeRequests.push(ProtoOASubscribeSpotsReq.decode(request.payload ?? new Uint8Array()));
+                if (
+                    request.payloadType ===
+                    ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                ) {
+                    subscribeRequests.push(
+                        ProtoOASubscribeSpotsReq.decode(
+                            request.payload ?? new Uint8Array(),
+                        ),
+                    );
                 }
                 return undefined;
-            }
+            },
         });
         await client.connect();
 
@@ -88,7 +113,7 @@ describe('SpotwareMarketData', () => {
         expect(subscribeRequests[0]?.symbolId).toEqual([2]);
         // proves it went through the same catalog a consumer could use directly
         expect(await marketData.symbols.findByName('GBPUSD')).toMatchObject({
-            symbolId: 2
+            symbolId: 2,
         });
     });
 
@@ -98,11 +123,17 @@ describe('SpotwareMarketData', () => {
 
         const marketData = new SpotwareMarketData(client);
 
-        await expect(marketData.subscribe('NOPE')).rejects.toThrow(/unknown symbol/i);
+        await expect(marketData.subscribe('NOPE')).rejects.toThrow(
+            /unknown symbol/i,
+        );
     });
 
     it('emits "price" with decimal bid/ask for a spot event, and forwards nothing for unrelated messages', async () => {
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients);
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -119,31 +150,41 @@ describe('SpotwareMarketData', () => {
                     symbolId: 1,
                     bid: 123_000,
                     ask: 123_050,
-                    timestamp: 42
-                })
-            ).finish()
+                    timestamp: 42,
+                }),
+            ).finish(),
         });
-        serverSocket.write(encodeFrame(ProtoMessage.encode(spotEvent).finish()));
+        serverSocket.write(
+            encodeFrame(ProtoMessage.encode(spotEvent).finish()),
+        );
 
         await vi.waitFor(() => expect(priceUpdates).toHaveLength(1));
         expect(priceUpdates[0]).toEqual({
             symbolId: 1,
             bid: 1.23,
             ask: 1.2305,
-            timestamp: 42
+            timestamp: 42,
         });
     });
 
     it('unsubscribes and stops tracking the symbol for resubscription', async () => {
         const subscribeCount = { value: 0 };
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients, {
-            onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    subscribeCount.value += 1;
-                }
-                return undefined;
-            }
-        });
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+            {
+                onOtherRequest: (request) => {
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                    ) {
+                        subscribeCount.value += 1;
+                    }
+                    return undefined;
+                },
+            },
+        );
         const firstConnection = nextServerSocket();
         const authenticated = vi.fn();
         client.on('authenticated', authenticated);
@@ -161,7 +202,7 @@ describe('SpotwareMarketData', () => {
         serverSocket.destroy();
         await secondConnection;
         await vi.waitFor(() => expect(authenticated).toHaveBeenCalledTimes(2), {
-            timeout: 2000
+            timeout: 2000,
         });
 
         expect(subscribeCount.value).toBe(1);
@@ -169,14 +210,26 @@ describe('SpotwareMarketData', () => {
 
     it('resubscribes to previously subscribed symbols after a reconnect', async () => {
         const subscribeRequests: ProtoOASubscribeSpotsReq[] = [];
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients, {
-            onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    subscribeRequests.push(ProtoOASubscribeSpotsReq.decode(request.payload ?? new Uint8Array()));
-                }
-                return undefined;
-            }
-        });
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+            {
+                onOtherRequest: (request) => {
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                    ) {
+                        subscribeRequests.push(
+                            ProtoOASubscribeSpotsReq.decode(
+                                request.payload ?? new Uint8Array(),
+                            ),
+                        );
+                    }
+                    return undefined;
+                },
+            },
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -190,7 +243,7 @@ describe('SpotwareMarketData', () => {
         await secondConnection;
 
         await vi.waitFor(() => expect(subscribeRequests).toHaveLength(2), {
-            timeout: 2000
+            timeout: 2000,
         });
         expect(subscribeRequests[1]?.symbolId).toEqual([1]);
     });
@@ -199,10 +252,18 @@ describe('SpotwareMarketData', () => {
         const requests: ProtoOAGetTrendbarsReq[] = [];
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ) {
-                    requests.push(ProtoOAGetTrendbarsReq.decode(request.payload ?? new Uint8Array()));
+                if (
+                    request.payloadType ===
+                    ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ
+                ) {
+                    requests.push(
+                        ProtoOAGetTrendbarsReq.decode(
+                            request.payload ?? new Uint8Array(),
+                        ),
+                    );
                     return ProtoMessage.fromPartial({
-                        payloadType: ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
+                        payloadType:
+                            ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
                         payload: ProtoOAGetTrendbarsRes.encode(
                             ProtoOAGetTrendbarsRes.fromPartial({
                                 period: ProtoOATrendbarPeriod.H1,
@@ -214,16 +275,16 @@ describe('SpotwareMarketData', () => {
                                         deltaOpen: 500, // open = 1.00500
                                         deltaHigh: 1_000, // high = 1.01000
                                         deltaClose: 200, // close = 1.00200
-                                        utcTimestampInMinutes: 1_000
-                                    })
-                                ]
-                            })
+                                        utcTimestampInMinutes: 1_000,
+                                    }),
+                                ],
+                            }),
                         ).finish(),
-                        clientMsgId: request.clientMsgId
+                        clientMsgId: request.clientMsgId,
                     });
                 }
                 return undefined;
-            }
+            },
         });
         await client.connect();
 
@@ -233,7 +294,7 @@ describe('SpotwareMarketData', () => {
             period: ProtoOATrendbarPeriod.H1,
             fromTimestamp: 1_000_000,
             toTimestamp: 2_000_000,
-            count: 10
+            count: 10,
         });
 
         expect(requests[0]).toMatchObject({
@@ -241,7 +302,7 @@ describe('SpotwareMarketData', () => {
             period: ProtoOATrendbarPeriod.H1,
             fromTimestamp: 1_000_000,
             toTimestamp: 2_000_000,
-            count: 10
+            count: 10,
         });
         expect(bars).toEqual([
             {
@@ -251,8 +312,8 @@ describe('SpotwareMarketData', () => {
                 open: 1.005,
                 high: 1.01,
                 close: 1.002,
-                volume: 42
-            }
+                volume: 42,
+            },
         ]);
     });
 
@@ -260,39 +321,56 @@ describe('SpotwareMarketData', () => {
         const rawPayloads: Uint8Array[] = [];
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ) {
+                if (
+                    request.payloadType ===
+                    ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ
+                ) {
                     rawPayloads.push(request.payload ?? new Uint8Array());
                     return ProtoMessage.fromPartial({
-                        payloadType: ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
-                        payload: ProtoOAGetTrendbarsRes.encode(ProtoOAGetTrendbarsRes.fromPartial({})).finish(),
-                        clientMsgId: request.clientMsgId
+                        payloadType:
+                            ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_RES,
+                        payload: ProtoOAGetTrendbarsRes.encode(
+                            ProtoOAGetTrendbarsRes.fromPartial({}),
+                        ).finish(),
+                        clientMsgId: request.clientMsgId,
                     });
                 }
                 return undefined;
-            }
+            },
         });
         await client.connect();
 
         const marketData = new SpotwareMarketData(client);
         await marketData.getTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M1
+            period: ProtoOATrendbarPeriod.M1,
         });
 
         expect(rawPayloads).toHaveLength(1);
         // field 5 (period), varint wire type -> tag 0x28, value M1=1
-        expect(containsByteSequence(rawPayloads[0]!, [0x28, ProtoOATrendbarPeriod.M1])).toBe(true);
+        expect(
+            containsByteSequence(rawPayloads[0]!, [
+                0x28,
+                ProtoOATrendbarPeriod.M1,
+            ]),
+        ).toBe(true);
     });
 
     it('emits a live "trendbar" carried inside a spot event', async () => {
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients);
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
 
         const marketData = new SpotwareMarketData(client);
         const received: Array<[number, ITrendbar]> = [];
-        marketData.on('trendbar', (symbolId, trendbar) => received.push([symbolId, trendbar]));
+        marketData.on('trendbar', (symbolId, trendbar) =>
+            received.push([symbolId, trendbar]),
+        );
 
         // cTrader piggybacks live bars on spot events rather than giving them their own message
         // type, so a client only watching for a dedicated payload type would never see one.
@@ -311,13 +389,15 @@ describe('SpotwareMarketData', () => {
                             deltaHigh: 4_000,
                             deltaClose: 2_500,
                             volume: 17,
-                            utcTimestampInMinutes: 100
-                        })
-                    ]
-                })
-            ).finish()
+                            utcTimestampInMinutes: 100,
+                        }),
+                    ],
+                }),
+            ).finish(),
         });
-        serverSocket.write(encodeFrame(ProtoMessage.encode(spotEvent).finish()));
+        serverSocket.write(
+            encodeFrame(ProtoMessage.encode(spotEvent).finish()),
+        );
 
         await vi.waitFor(() => expect(received).toHaveLength(1));
         expect(received[0]?.[0]).toBe(1);
@@ -328,12 +408,16 @@ describe('SpotwareMarketData', () => {
             high: 1.24,
             low: 1.2,
             close: 1.225,
-            volume: 17
+            volume: 17,
         });
     });
 
     it('emits "depth" with decimal prices and the ids that left the book', async () => {
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients);
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -349,26 +433,30 @@ describe('SpotwareMarketData', () => {
                     ctidTraderAccountId: TEST_ACCOUNT_ID,
                     symbolId: 1,
                     newQuotes: [{ id: 10, size: 500_000, bid: 123_000 }],
-                    deletedQuotes: [9]
-                })
-            ).finish()
+                    deletedQuotes: [9],
+                }),
+            ).finish(),
         });
-        serverSocket.write(encodeFrame(ProtoMessage.encode(depthEvent).finish()));
+        serverSocket.write(
+            encodeFrame(ProtoMessage.encode(depthEvent).finish()),
+        );
 
         await vi.waitFor(() => expect(received).toHaveLength(1));
         expect(received[0]).toEqual({
             symbolId: 1,
             newQuotes: [{ id: 10, size: 500_000, bid: 1.23, ask: undefined }],
-            deletedQuoteIds: [9]
+            deletedQuoteIds: [9],
         });
     });
 
     it('accumulates the delta-encoded tick data into absolute timestamps and prices', async () => {
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) =>
-                request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ
+                request.payloadType ===
+                ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ
                     ? ProtoMessage.fromPartial({
-                          payloadType: ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_RES,
+                          payloadType:
+                              ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_RES,
                           payload: ProtoOAGetTickDataRes.encode(
                               ProtoOAGetTickDataRes.fromPartial({
                                   ctidTraderAccountId: TEST_ACCOUNT_ID,
@@ -377,48 +465,67 @@ describe('SpotwareMarketData', () => {
                                   tickData: [
                                       {
                                           timestamp: 1_700_000_000_000,
-                                          tick: 123_000
+                                          tick: 123_000,
                                       },
                                       { timestamp: -1_000, tick: -50 },
-                                      { timestamp: -2_000, tick: 20 }
+                                      { timestamp: -2_000, tick: 20 },
                                   ],
-                                  hasMore: true
-                              })
+                                  hasMore: true,
+                              }),
                           ).finish(),
-                          clientMsgId: request.clientMsgId
+                          clientMsgId: request.clientMsgId,
                       })
-                    : undefined
+                    : undefined,
         });
         await client.connect();
         const marketData = new SpotwareMarketData(client);
 
         const page = await marketData.getTickData({
             symbolId: 1,
-            type: ProtoOAQuoteType.BID
+            type: ProtoOAQuoteType.BID,
         });
 
         expect(page.hasMore).toBe(true);
         expect(page.ticks).toEqual([
             { timestamp: 1_700_000_000_000, price: 1.23 },
             { timestamp: 1_699_999_999_000, price: 1.2295 },
-            { timestamp: 1_699_999_997_000, price: 1.2297 }
+            { timestamp: 1_699_999_997_000, price: 1.2297 },
         ]);
     });
 
     it('resubscribes to live trendbars and depth after a reconnect', async () => {
         const trendbarRequests: ProtoOASubscribeLiveTrendbarReq[] = [];
         const depthRequests: ProtoOASubscribeDepthQuotesReq[] = [];
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients, {
-            onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ) {
-                    trendbarRequests.push(ProtoOASubscribeLiveTrendbarReq.decode(request.payload ?? new Uint8Array()));
-                }
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ) {
-                    depthRequests.push(ProtoOASubscribeDepthQuotesReq.decode(request.payload ?? new Uint8Array()));
-                }
-                return undefined;
-            }
-        });
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+            {
+                onOtherRequest: (request) => {
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ
+                    ) {
+                        trendbarRequests.push(
+                            ProtoOASubscribeLiveTrendbarReq.decode(
+                                request.payload ?? new Uint8Array(),
+                            ),
+                        );
+                    }
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ
+                    ) {
+                        depthRequests.push(
+                            ProtoOASubscribeDepthQuotesReq.decode(
+                                request.payload ?? new Uint8Array(),
+                            ),
+                        );
+                    }
+                    return undefined;
+                },
+            },
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -426,7 +533,7 @@ describe('SpotwareMarketData', () => {
         const marketData = new SpotwareMarketData(client);
         await marketData.subscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M5
+            period: ProtoOATrendbarPeriod.M5,
         });
         await marketData.subscribeDepth(2);
         expect(trendbarRequests).toHaveLength(1);
@@ -439,10 +546,10 @@ describe('SpotwareMarketData', () => {
         // A fresh TCP connection has no memory of any subscription, so every stream the caller
         // asked for has to be re-established, not just spots.
         await vi.waitFor(() => expect(trendbarRequests).toHaveLength(2), {
-            timeout: 2000
+            timeout: 2000,
         });
         await vi.waitFor(() => expect(depthRequests).toHaveLength(2), {
-            timeout: 2000
+            timeout: 2000,
         });
         expect(trendbarRequests[1]?.period).toBe(ProtoOATrendbarPeriod.M5);
         expect(trendbarRequests[1]?.symbolId).toBe(1);
@@ -452,17 +559,36 @@ describe('SpotwareMarketData', () => {
     it('stops resubscribing to a live trendbar once it is unsubscribed', async () => {
         const trendbarRequests: ProtoOASubscribeLiveTrendbarReq[] = [];
         const spotRequests: ProtoOASubscribeSpotsReq[] = [];
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients, {
-            onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ) {
-                    trendbarRequests.push(ProtoOASubscribeLiveTrendbarReq.decode(request.payload ?? new Uint8Array()));
-                }
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    spotRequests.push(ProtoOASubscribeSpotsReq.decode(request.payload ?? new Uint8Array()));
-                }
-                return undefined;
-            }
-        });
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+            {
+                onOtherRequest: (request) => {
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ
+                    ) {
+                        trendbarRequests.push(
+                            ProtoOASubscribeLiveTrendbarReq.decode(
+                                request.payload ?? new Uint8Array(),
+                            ),
+                        );
+                    }
+                    if (
+                        request.payloadType ===
+                        ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                    ) {
+                        spotRequests.push(
+                            ProtoOASubscribeSpotsReq.decode(
+                                request.payload ?? new Uint8Array(),
+                            ),
+                        );
+                    }
+                    return undefined;
+                },
+            },
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -470,11 +596,11 @@ describe('SpotwareMarketData', () => {
         const marketData = new SpotwareMarketData(client);
         await marketData.subscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M5
+            period: ProtoOATrendbarPeriod.M5,
         });
         await marketData.unsubscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M5
+            period: ProtoOATrendbarPeriod.M5,
         });
         expect(spotRequests).toHaveLength(1);
 
@@ -486,7 +612,7 @@ describe('SpotwareMarketData', () => {
         // trendbar one, so its resubscribe is the signal that the whole resubscribe pass has
         // run — without waiting for it, this would assert before there was anything to see.
         await vi.waitFor(() => expect(spotRequests).toHaveLength(2), {
-            timeout: 2000
+            timeout: 2000,
         });
         expect(trendbarRequests).toHaveLength(1);
     });
@@ -495,11 +621,18 @@ describe('SpotwareMarketData', () => {
         const spotRequests: ProtoOASubscribeSpotsReq[] = [];
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType === ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ) {
-                    spotRequests.push(ProtoOASubscribeSpotsReq.decode(request.payload ?? new Uint8Array()));
+                if (
+                    request.payloadType ===
+                    ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ
+                ) {
+                    spotRequests.push(
+                        ProtoOASubscribeSpotsReq.decode(
+                            request.payload ?? new Uint8Array(),
+                        ),
+                    );
                 }
                 return undefined;
-            }
+            },
         });
         await client.connect();
 
@@ -508,7 +641,7 @@ describe('SpotwareMarketData', () => {
         // silently produces nothing at all.
         await marketData.subscribeLiveTrendbars({
             symbolId: 1,
-            period: ProtoOATrendbarPeriod.M5
+            period: ProtoOATrendbarPeriod.M5,
         });
 
         expect(spotRequests).toHaveLength(1);
@@ -516,7 +649,11 @@ describe('SpotwareMarketData', () => {
     });
 
     it('reports an unchanged side as absent, not as a price of zero', async () => {
-        const { client, nextServerSocket } = createTestClient(server, port, createdClients);
+        const { client, nextServerSocket } = createTestClient(
+            server,
+            port,
+            createdClients,
+        );
         const firstConnection = nextServerSocket();
         await client.connect();
         const serverSocket = await firstConnection;
@@ -533,11 +670,13 @@ describe('SpotwareMarketData', () => {
                 ProtoOASpotEvent.fromPartial({
                     ctidTraderAccountId: TEST_ACCOUNT_ID,
                     symbolId: 1,
-                    bid: 123_000
-                })
-            ).finish()
+                    bid: 123_000,
+                }),
+            ).finish(),
         });
-        serverSocket.write(encodeFrame(ProtoMessage.encode(spotEvent).finish()));
+        serverSocket.write(
+            encodeFrame(ProtoMessage.encode(spotEvent).finish()),
+        );
 
         await vi.waitFor(() => expect(received).toHaveLength(1));
         expect(received[0]?.bid).toBeCloseTo(1.23, 5);

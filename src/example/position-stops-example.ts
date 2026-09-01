@@ -21,53 +21,74 @@ async function main(): Promise<void> {
 
     // The order lifecycle arrives here, not only in the awaited responses: this is what would
     // tell a long-running bot that a stop-loss fired hours after it stopped paying attention.
-    trading.on('execution', (event) => console.log(`  [execution] type=${event.executionType} position=${event.position?.positionId ?? '-'}`));
-    trading.on('orderError', (event) => console.log(`  [orderError] ${event.errorCode}: ${event.description}`));
+    trading.on('execution', (event) =>
+        console.log(
+            `  [execution] type=${event.executionType} position=${event.position?.positionId ?? '-'}`,
+        ),
+    );
+    trading.on('orderError', (event) =>
+        console.log(`  [orderError] ${event.errorCode}: ${event.description}`),
+    );
 
     const symbol = await marketData.symbols.findByName(SYMBOL_NAME);
     if (!symbol) {
-        throw new Error(`Symbol "${SYMBOL_NAME}" was not found for this account`);
+        throw new Error(
+            `Symbol "${SYMBOL_NAME}" was not found for this account`,
+        );
     }
 
     const fullSymbol = await marketData.symbols.getFullSymbol(symbol.symbolId);
     const digits = fullSymbol?.digits ?? 5;
     const volumeUnits = (fullSymbol?.minVolume ?? 100_000) / 100;
 
-    console.log(`\nOpening a ${volumeUnits}-unit BUY on ${symbol.symbolName}...`);
+    console.log(
+        `\nOpening a ${volumeUnits}-unit BUY on ${symbol.symbolName}...`,
+    );
     const opened = await trading.placeMarketOrder({
         symbolId: symbol.symbolId,
         tradeSide: ProtoOATradeSide.BUY,
         volume: volumeUnits,
-        label: 'ctrader-x position-stops example'
+        label: 'ctrader-x position-stops example',
     });
 
     // The fill's own execution event does not carry a usable entry price, so the position is
     // read back from the account instead of trusting the response for it.
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
     const { positions } = await trading.getOpenPositionsAndOrders();
-    const position = positions.find((candidate) => candidate.positionId === opened.position?.positionId) ?? positions[0];
+    const position =
+        positions.find(
+            (candidate) => candidate.positionId === opened.position?.positionId,
+        ) ?? positions[0];
 
     if (!position?.price) {
-        throw new Error('The position was opened but carries no entry price to work from');
+        throw new Error(
+            'The position was opened but carries no entry price to work from',
+        );
     }
 
-    console.log(`Filled at ${position.price} (positionId ${position.positionId}).`);
+    console.log(
+        `Filled at ${position.price} (positionId ${position.positionId}).`,
+    );
 
     const stopLoss = Number((position.price * 0.97).toFixed(digits));
     const takeProfit = Number((position.price * 1.03).toFixed(digits));
 
-    console.log(`Attaching stop-loss ${stopLoss} and take-profit ${takeProfit}...`);
+    console.log(
+        `Attaching stop-loss ${stopLoss} and take-profit ${takeProfit}...`,
+    );
     const amended = await trading.amendPositionStopLossTakeProfit({
         positionId: position.positionId,
         stopLoss,
-        takeProfit
+        takeProfit,
     });
-    console.log(`Position now reports SL=${amended.position?.stopLoss} TP=${amended.position?.takeProfit}`);
+    console.log(
+        `Position now reports SL=${amended.position?.stopLoss} TP=${amended.position?.takeProfit}`,
+    );
 
     console.log('Closing the position...');
     await trading.closePosition({
         positionId: position.positionId,
-        volume: volumeUnits
+        volume: volumeUnits,
     });
 
     // Reconcile lags a close by a moment, so an immediate query can still show the position.

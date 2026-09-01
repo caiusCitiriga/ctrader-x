@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpotwareSocketAuthError } from '../../src/auth/spotware-socket-auth-error';
 import { SpotwareSocketAuthenticator } from '../../src/auth/spotware-socket-authenticator';
 import { encodeFrame, FrameDecoder } from '../../src/transport/frame-codec';
-import { SpotwareHost, SpotwareTransport, type SpotwareSocketFactory } from '../../src/transport';
+import {
+    SpotwareHost,
+    SpotwareTransport,
+    type SpotwareSocketFactory,
+} from '../../src/transport';
 import {
     ProtoErrorRes,
     ProtoMessage,
@@ -14,7 +18,7 @@ import {
     ProtoOAErrorRes,
     ProtoOAGetAccountListByAccessTokenRes,
     ProtoOAPayloadType,
-    ProtoPayloadType
+    ProtoPayloadType,
 } from '../../src/types';
 
 function createLoopbackSocketFactory(port: number): SpotwareSocketFactory {
@@ -33,15 +37,26 @@ describe('SpotwareSocketAuthenticator', () => {
 
     beforeEach(async () => {
         server = net.createServer();
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise<void>((resolve) =>
+            server.listen(0, '127.0.0.1', resolve),
+        );
         const port = (server.address() as net.AddressInfo).port;
 
-        const connectionReceived = new Promise<net.Socket>((resolve) => server.once('connection', resolve));
+        const connectionReceived = new Promise<net.Socket>((resolve) =>
+            server.once('connection', resolve),
+        );
 
-        transport = new SpotwareTransport({ host: SpotwareHost.DEMO, port, socketFactory: createLoopbackSocketFactory(port) });
+        transport = new SpotwareTransport({
+            host: SpotwareHost.DEMO,
+            port,
+            socketFactory: createLoopbackSocketFactory(port),
+        });
         transport.on('error', () => undefined);
 
-        const [, socket] = await Promise.all([transport.connect(), connectionReceived]);
+        const [, socket] = await Promise.all([
+            transport.connect(),
+            connectionReceived,
+        ]);
         serverSocket = socket;
         // A server-side socket with no 'data' listener stays paused and never notices the
         // peer disconnecting, which hangs server.close() in afterEach for tests that never
@@ -57,16 +72,23 @@ describe('SpotwareSocketAuthenticator', () => {
     // Decodes the next request the fake server receives and lets the test build the reply,
     // mirroring how a real cTrader server would respond over the same connection — including
     // echoing the request's clientMsgId, which is how a response is matched to its request.
-    function respondOnce(build: (request: ProtoMessage) => ProtoMessage, { echoClientMsgId = true } = {}): void {
+    function respondOnce(
+        build: (request: ProtoMessage) => ProtoMessage,
+        { echoClientMsgId = true } = {},
+    ): void {
         const decoder = new FrameDecoder();
         const onData = (chunk: Buffer) => {
             for (const frame of decoder.push(chunk)) {
                 const request = ProtoMessage.decode(frame);
                 const response = ProtoMessage.fromPartial({
                     ...build(request),
-                    clientMsgId: echoClientMsgId ? request.clientMsgId : undefined
+                    clientMsgId: echoClientMsgId
+                        ? request.clientMsgId
+                        : undefined,
                 });
-                serverSocket.write(encodeFrame(ProtoMessage.encode(response).finish()));
+                serverSocket.write(
+                    encodeFrame(ProtoMessage.encode(response).finish()),
+                );
                 serverSocket.off('data', onData);
             }
         };
@@ -75,15 +97,21 @@ describe('SpotwareSocketAuthenticator', () => {
 
     it('authenticates the application', async () => {
         respondOnce((request) => {
-            expect(request.payloadType).toBe(ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ);
+            expect(request.payloadType).toBe(
+                ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_REQ,
+            );
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES,
-                payload: ProtoOAApplicationAuthRes.encode(ProtoOAApplicationAuthRes.fromPartial({})).finish()
+                payload: ProtoOAApplicationAuthRes.encode(
+                    ProtoOAApplicationAuthRes.fromPartial({}),
+                ).finish(),
             });
         });
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
-        await expect(authenticator.authenticateApplication('client-id', 'client-secret')).resolves.toBeUndefined();
+        await expect(
+            authenticator.authenticateApplication('client-id', 'client-secret'),
+        ).resolves.toBeUndefined();
     });
 
     it('rejects with a typed error on PROTO_OA_ERROR_RES', async () => {
@@ -91,15 +119,20 @@ describe('SpotwareSocketAuthenticator', () => {
             ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_ERROR_RES,
                 payload: ProtoOAErrorRes.encode(
-                    ProtoOAErrorRes.fromPartial({ errorCode: 'INVALID_CLIENT', description: 'bad client secret' })
-                ).finish()
-            })
+                    ProtoOAErrorRes.fromPartial({
+                        errorCode: 'INVALID_CLIENT',
+                        description: 'bad client secret',
+                    }),
+                ).finish(),
+            }),
         );
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
-        await expect(authenticator.authenticateApplication('client-id', 'wrong-secret')).rejects.toMatchObject({
+        await expect(
+            authenticator.authenticateApplication('client-id', 'wrong-secret'),
+        ).rejects.toMatchObject({
             message: 'bad client secret',
-            errorCode: 'INVALID_CLIENT'
+            errorCode: 'INVALID_CLIENT',
         });
     });
 
@@ -110,26 +143,40 @@ describe('SpotwareSocketAuthenticator', () => {
             () =>
                 ProtoMessage.fromPartial({
                     payloadType: ProtoPayloadType.ERROR_RES,
-                    payload: ProtoErrorRes.encode(ProtoErrorRes.fromPartial({ errorCode: 'FRAME_TOO_LONG' })).finish()
+                    payload: ProtoErrorRes.encode(
+                        ProtoErrorRes.fromPartial({
+                            errorCode: 'FRAME_TOO_LONG',
+                        }),
+                    ).finish(),
                 }),
-            { echoClientMsgId: false }
+            { echoClientMsgId: false },
         );
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
-        await expect(authenticator.authenticateApplication('client-id', 'client-secret')).rejects.toBeInstanceOf(SpotwareSocketAuthError);
+        await expect(
+            authenticator.authenticateApplication('client-id', 'client-secret'),
+        ).rejects.toBeInstanceOf(SpotwareSocketAuthError);
     });
 
     it('lists the accounts linked to an access token', async () => {
         respondOnce((request) => {
-            expect(request.payloadType).toBe(ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ);
+            expect(request.payloadType).toBe(
+                ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_REQ,
+            );
             return ProtoMessage.fromPartial({
-                payloadType: ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES,
+                payloadType:
+                    ProtoOAPayloadType.PROTO_OA_GET_ACCOUNTS_BY_ACCESS_TOKEN_RES,
                 payload: ProtoOAGetAccountListByAccessTokenRes.encode(
                     ProtoOAGetAccountListByAccessTokenRes.fromPartial({
                         accessToken: 'access-token',
-                        ctidTraderAccount: [ProtoOACtidTraderAccount.fromPartial({ ctidTraderAccountId: 123, isLive: false })]
-                    })
-                ).finish()
+                        ctidTraderAccount: [
+                            ProtoOACtidTraderAccount.fromPartial({
+                                ctidTraderAccountId: 123,
+                                isLive: false,
+                            }),
+                        ],
+                    }),
+                ).finish(),
             });
         });
 
@@ -143,15 +190,23 @@ describe('SpotwareSocketAuthenticator', () => {
 
     it('authenticates a specific account', async () => {
         respondOnce((request) => {
-            expect(request.payloadType).toBe(ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ);
+            expect(request.payloadType).toBe(
+                ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ,
+            );
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES,
-                payload: ProtoOAAccountAuthRes.encode(ProtoOAAccountAuthRes.fromPartial({ ctidTraderAccountId: 123 })).finish()
+                payload: ProtoOAAccountAuthRes.encode(
+                    ProtoOAAccountAuthRes.fromPartial({
+                        ctidTraderAccountId: 123,
+                    }),
+                ).finish(),
             });
         });
 
         const authenticator = new SpotwareSocketAuthenticator(transport);
-        await expect(authenticator.authenticateAccount(123, 'access-token')).resolves.toBeUndefined();
+        await expect(
+            authenticator.authenticateAccount(123, 'access-token'),
+        ).resolves.toBeUndefined();
     });
 
     it('settles each of two overlapping handshakes from its own response', async () => {
@@ -163,9 +218,17 @@ describe('SpotwareSocketAuthenticator', () => {
             }
         });
 
-        const authenticator = new SpotwareSocketAuthenticator(transport, { responseTimeoutMs: 300 });
-        const abandoned = authenticator.authenticateApplication('client-id', 'client-secret');
-        const answered = authenticator.authenticateApplication('client-id', 'client-secret');
+        const authenticator = new SpotwareSocketAuthenticator(transport, {
+            responseTimeoutMs: 300,
+        });
+        const abandoned = authenticator.authenticateApplication(
+            'client-id',
+            'client-secret',
+        );
+        const answered = authenticator.authenticateApplication(
+            'client-id',
+            'client-secret',
+        );
 
         await vi.waitFor(() => expect(requests).toHaveLength(2));
 
@@ -176,12 +239,15 @@ describe('SpotwareSocketAuthenticator', () => {
             encodeFrame(
                 ProtoMessage.encode(
                     ProtoMessage.fromPartial({
-                        payloadType: ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES,
-                        payload: ProtoOAApplicationAuthRes.encode(ProtoOAApplicationAuthRes.fromPartial({})).finish(),
-                        clientMsgId: requests[1]?.clientMsgId
-                    })
-                ).finish()
-            )
+                        payloadType:
+                            ProtoOAPayloadType.PROTO_OA_APPLICATION_AUTH_RES,
+                        payload: ProtoOAApplicationAuthRes.encode(
+                            ProtoOAApplicationAuthRes.fromPartial({}),
+                        ).finish(),
+                        clientMsgId: requests[1]?.clientMsgId,
+                    }),
+                ).finish(),
+            ),
         );
 
         await expect(answered).resolves.toBeUndefined();
@@ -189,8 +255,12 @@ describe('SpotwareSocketAuthenticator', () => {
     });
 
     it('times out when the server never responds', async () => {
-        const authenticator = new SpotwareSocketAuthenticator(transport, { responseTimeoutMs: 50 });
+        const authenticator = new SpotwareSocketAuthenticator(transport, {
+            responseTimeoutMs: 50,
+        });
 
-        await expect(authenticator.authenticateApplication('client-id', 'client-secret')).rejects.toThrow(/Timed out/);
+        await expect(
+            authenticator.authenticateApplication('client-id', 'client-secret'),
+        ).rejects.toThrow(/Timed out/);
     });
 });

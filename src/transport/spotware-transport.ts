@@ -1,10 +1,17 @@
 import * as tls from 'node:tls';
 import type { Duplex } from 'node:stream';
 
-import { TypedEventEmitter, type EventMap } from '../shared/typed-event-emitter';
+import {
+    TypedEventEmitter,
+    type EventMap,
+} from '../shared/typed-event-emitter';
 import { ProtoHeartbeatEvent, ProtoMessage, ProtoPayloadType } from '../types';
 import { encodeFrame, FrameDecoder } from './frame-codec';
-import { calculateReconnectDelayMs, DEFAULT_RECONNECT_BACKOFF_OPTIONS, type IReconnectBackoffOptions } from './reconnect-backoff';
+import {
+    calculateReconnectDelayMs,
+    DEFAULT_RECONNECT_BACKOFF_OPTIONS,
+    type IReconnectBackoffOptions,
+} from './reconnect-backoff';
 import { SpotwareRateLimiter } from './spotware-rate-limiter';
 import { SPOTWARE_PORT, SpotwareHost } from './spotware-host.enum';
 
@@ -25,7 +32,10 @@ export type SpotwareDisconnectReason = 'manual' | 'dropped';
  * Resolves once the connection is fully ready to use (e.g. after the TLS handshake).
  * Lets tests substitute a plain local TCP server without touching any transport logic.
  */
-export type SpotwareSocketFactory = (port: number, host: string) => Promise<Duplex>;
+export type SpotwareSocketFactory = (
+    port: number,
+    host: string,
+) => Promise<Duplex>;
 
 const defaultSocketFactory: SpotwareSocketFactory = (port, host) =>
     new Promise((resolve, reject) => {
@@ -94,10 +104,16 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
         super();
         this.host = options.host;
         this.port = options.port ?? SPOTWARE_PORT;
-        this.reconnectBackoffOptions = options.reconnectBackoff ?? DEFAULT_RECONNECT_BACKOFF_OPTIONS;
+        this.reconnectBackoffOptions =
+            options.reconnectBackoff ?? DEFAULT_RECONNECT_BACKOFF_OPTIONS;
         this.socketFactory = options.socketFactory ?? defaultSocketFactory;
-        this.staleConnectionTimeoutMs = options.staleConnectionTimeoutMs ?? DEFAULT_STALE_CONNECTION_TIMEOUT_MS;
-        this.livenessCheckIntervalMs = Math.max(MIN_LIVENESS_CHECK_INTERVAL_MS, Math.floor(this.staleConnectionTimeoutMs / 6));
+        this.staleConnectionTimeoutMs =
+            options.staleConnectionTimeoutMs ??
+            DEFAULT_STALE_CONNECTION_TIMEOUT_MS;
+        this.livenessCheckIntervalMs = Math.max(
+            MIN_LIVENESS_CHECK_INTERVAL_MS,
+            Math.floor(this.staleConnectionTimeoutMs / 6),
+        );
     }
 
     connect(): Promise<void> {
@@ -128,7 +144,9 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
     async send(message: ProtoMessage): Promise<void> {
         const socket = this.socket;
         if (!socket || socket.destroyed) {
-            throw new Error('Cannot send a message while the transport is disconnected');
+            throw new Error(
+                'Cannot send a message while the transport is disconnected',
+            );
         }
 
         await this.rateLimiter.throttle(message.payloadType);
@@ -171,7 +189,9 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
         this.lastMessageReceivedAt = Date.now();
 
         const frameDecoder = new FrameDecoder();
-        socket.on('data', (chunk: Buffer) => this.handleData(frameDecoder, chunk));
+        socket.on('data', (chunk: Buffer) =>
+            this.handleData(frameDecoder, chunk),
+        );
         socket.once('error', (error: Error) => this.emit('error', error));
         socket.once('close', () => this.handleClose());
 
@@ -202,7 +222,10 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
     private handleClose(): void {
         this.stopHeartbeat();
         this.stopLivenessWatchdog();
-        this.emit('disconnected', this.disconnectRequested ? 'manual' : 'dropped');
+        this.emit(
+            'disconnected',
+            this.disconnectRequested ? 'manual' : 'dropped',
+        );
 
         if (this.disconnectRequested) {
             return;
@@ -212,7 +235,10 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
     }
 
     private scheduleReconnect(): void {
-        const delayMs = calculateReconnectDelayMs(this.reconnectAttempt, this.reconnectBackoffOptions);
+        const delayMs = calculateReconnectDelayMs(
+            this.reconnectAttempt,
+            this.reconnectBackoffOptions,
+        );
         this.reconnectAttempt += 1;
 
         this.emit('reconnecting', this.reconnectAttempt, delayMs);
@@ -232,7 +258,9 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
 
     private startHeartbeat(): void {
         this.heartbeatTimer = setInterval(() => {
-            this.send(this.buildHeartbeatMessage()).catch((error: Error) => this.emit('error', error));
+            this.send(this.buildHeartbeatMessage()).catch((error: Error) =>
+                this.emit('error', error),
+            );
         }, HEARTBEAT_INTERVAL_MS);
     }
 
@@ -242,7 +270,11 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
         this.livenessTimer = setInterval(() => {
             const idleForMs = Date.now() - this.lastMessageReceivedAt;
             if (idleForMs > this.staleConnectionTimeoutMs) {
-                this.socket?.destroy(new Error(`No data received for ${idleForMs}ms; treating the connection as dead`));
+                this.socket?.destroy(
+                    new Error(
+                        `No data received for ${idleForMs}ms; treating the connection as dead`,
+                    ),
+                );
             }
         }, this.livenessCheckIntervalMs);
     }
@@ -264,7 +296,9 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
     private buildHeartbeatMessage(): ProtoMessage {
         return ProtoMessage.fromPartial({
             payloadType: ProtoPayloadType.HEARTBEAT_EVENT,
-            payload: ProtoHeartbeatEvent.encode(ProtoHeartbeatEvent.fromPartial({})).finish()
+            payload: ProtoHeartbeatEvent.encode(
+                ProtoHeartbeatEvent.fromPartial({}),
+            ).finish(),
         });
     }
 }

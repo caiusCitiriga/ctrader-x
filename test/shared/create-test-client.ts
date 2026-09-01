@@ -2,7 +2,11 @@ import * as net from 'node:net';
 
 import { SpotwareOAuthClient } from '../../src/auth';
 import { SpotwareClient } from '../../src/client';
-import { SpotwareHost, SpotwareTransport, type SpotwareSocketFactory } from '../../src/transport';
+import {
+    SpotwareHost,
+    SpotwareTransport,
+    type SpotwareSocketFactory,
+} from '../../src/transport';
 import type { ProtoMessage, ProtoOALightSymbol } from '../../src/types';
 import { TEST_ACCOUNT_ID, wireFakeServer } from './fake-spotware-server';
 
@@ -28,7 +32,7 @@ export function createTestClient(
         symbols?: ProtoOALightSymbol[];
         onOtherRequest?: (request: ProtoMessage) => ProtoMessage | undefined;
         shouldRespond?: (request: ProtoMessage) => boolean;
-    } = {}
+    } = {},
 ): ITestClientHarness {
     let pendingResolvers: Array<(socket: net.Socket) => void> = [];
 
@@ -44,23 +48,32 @@ export function createTestClient(
         host: SpotwareHost.DEMO,
         port,
         socketFactory: createLoopbackSocketFactory(port),
-        reconnectBackoff: { baseDelayMs: 10, maxDelayMs: 20, factor: 2 }
+        reconnectBackoff: { baseDelayMs: 10, maxDelayMs: 20, factor: 2 },
     });
     transport.on('error', () => undefined);
 
     const client = new SpotwareClient({
         transport,
-        oauthClient: new SpotwareOAuthClient({ clientId: 'client-id', clientSecret: 'client-secret' }),
+        oauthClient: new SpotwareOAuthClient({
+            clientId: 'client-id',
+            clientSecret: 'client-secret',
+        }),
         clientId: 'client-id',
         clientSecret: 'client-secret',
         ctidTraderAccountId: TEST_ACCOUNT_ID,
-        token: { accessToken: 'access-token', refreshToken: 'refresh-token', tokenType: 'bearer', expiresIn: 2_628_000 },
-        requestTimeoutMs: 200
+        token: {
+            accessToken: 'access-token',
+            refreshToken: 'refresh-token',
+            tokenType: 'bearer',
+            expiresIn: 2_628_000,
+        },
+        requestTimeoutMs: 200,
     });
     createdClients.push(client);
 
     return {
         client,
-        nextServerSocket: () => new Promise((resolve) => pendingResolvers.push(resolve))
+        nextServerSocket: () =>
+            new Promise((resolve) => pendingResolvers.push(resolve)),
     };
 }

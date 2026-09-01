@@ -1,7 +1,10 @@
 import type { SpotwareClient } from '../client';
 import { appendRequiredEnumIfDropped } from '../shared/proto-required-field';
 import { SPOTWARE_VOLUME_SCALE } from '../shared/spotware-scale';
-import { TypedEventEmitter, type EventMap } from '../shared/typed-event-emitter';
+import {
+    TypedEventEmitter,
+    type EventMap,
+} from '../shared/typed-event-emitter';
 import {
     ProtoMessage,
     ProtoOAAmendOrderReq,
@@ -19,7 +22,7 @@ import {
     ProtoOAReconcileReq,
     ProtoOAReconcileRes,
     ProtoOATimeInForce,
-    ProtoOATradeSide
+    ProtoOATradeSide,
 } from '../types';
 
 export interface IPlaceMarketOrderParams {
@@ -152,56 +155,76 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
         this.client.on('message', (message) => this.handleMessage(message));
     }
 
-    placeMarketOrder(params: IPlaceMarketOrderParams): Promise<ProtoOAExecutionEvent> {
+    placeMarketOrder(
+        params: IPlaceMarketOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         return this.placeOrder({
             ...params,
-            orderType: ProtoOAOrderType.MARKET
+            orderType: ProtoOAOrderType.MARKET,
         });
     }
 
-    placeLimitOrder(params: IPlaceLimitOrderParams): Promise<ProtoOAExecutionEvent> {
+    placeLimitOrder(
+        params: IPlaceLimitOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         return this.placeOrder({
             ...params,
-            orderType: ProtoOAOrderType.LIMIT
+            orderType: ProtoOAOrderType.LIMIT,
         });
     }
 
     /** A stop entry order: becomes a market order once the market trades through stopPrice. */
-    placeStopOrder(params: IPlaceStopOrderParams): Promise<ProtoOAExecutionEvent> {
+    placeStopOrder(
+        params: IPlaceStopOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         return this.placeOrder({ ...params, orderType: ProtoOAOrderType.STOP });
     }
 
     /** Like a stop order, but fills as a limit order capped at slippageInPoints past stopPrice. */
-    placeStopLimitOrder(params: IPlaceStopLimitOrderParams): Promise<ProtoOAExecutionEvent> {
+    placeStopLimitOrder(
+        params: IPlaceStopLimitOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         return this.placeOrder({
             ...params,
-            orderType: ProtoOAOrderType.STOP_LIMIT
+            orderType: ProtoOAOrderType.STOP_LIMIT,
         });
     }
 
     /** A market order that is rejected rather than filled if price has moved beyond the slippage range. */
-    placeMarketRangeOrder(params: IPlaceMarketRangeOrderParams): Promise<ProtoOAExecutionEvent> {
+    placeMarketRangeOrder(
+        params: IPlaceMarketRangeOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         return this.placeOrder({
             ...params,
-            orderType: ProtoOAOrderType.MARKET_RANGE
+            orderType: ProtoOAOrderType.MARKET_RANGE,
         });
     }
 
-    async amendOrder(params: IAmendOrderParams): Promise<ProtoOAExecutionEvent> {
+    async amendOrder(
+        params: IAmendOrderParams,
+    ): Promise<ProtoOAExecutionEvent> {
         const request = ProtoOAAmendOrderReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             orderId: params.orderId,
-            volume: params.volume === undefined ? undefined : params.volume * SPOTWARE_VOLUME_SCALE,
+            volume:
+                params.volume === undefined
+                    ? undefined
+                    : params.volume * SPOTWARE_VOLUME_SCALE,
             limitPrice: params.limitPrice,
             stopPrice: params.stopPrice,
             stopLoss: params.stopLoss,
             takeProfit: params.takeProfit,
-            expirationTimestamp: params.expirationTimestamp
+            expirationTimestamp: params.expirationTimestamp,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_AMEND_ORDER_REQ, ProtoOAAmendOrderReq.encode(request).finish());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_AMEND_ORDER_REQ,
+            ProtoOAAmendOrderReq.encode(request).finish(),
+        );
 
-        return ProtoOAExecutionEvent.decode(response.payload ?? new Uint8Array());
+        return ProtoOAExecutionEvent.decode(
+            response.payload ?? new Uint8Array(),
+        );
     }
 
     /**
@@ -209,7 +232,9 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
      * up to breakeven. `amendOrder` cannot do this: it targets pending orders, whereas a
      * position's stop-loss and take-profit are properties of the position itself.
      */
-    async amendPositionStopLossTakeProfit(params: IAmendPositionStopLossTakeProfitParams): Promise<ProtoOAExecutionEvent> {
+    async amendPositionStopLossTakeProfit(
+        params: IAmendPositionStopLossTakeProfitParams,
+    ): Promise<ProtoOAExecutionEvent> {
         const request = ProtoOAAmendPositionSLTPReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             positionId: params.positionId,
@@ -217,53 +242,71 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
             takeProfit: params.takeProfit,
             trailingStopLoss: params.trailingStopLoss,
             guaranteedStopLoss: params.guaranteedStopLoss,
-            stopLossTriggerMethod: params.stopLossTriggerMethod
+            stopLossTriggerMethod: params.stopLossTriggerMethod,
         });
 
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_AMEND_POSITION_SLTP_REQ,
-            ProtoOAAmendPositionSLTPReq.encode(request).finish()
+            ProtoOAAmendPositionSLTPReq.encode(request).finish(),
         );
 
-        return ProtoOAExecutionEvent.decode(response.payload ?? new Uint8Array());
+        return ProtoOAExecutionEvent.decode(
+            response.payload ?? new Uint8Array(),
+        );
     }
 
     async cancelOrder(orderId: number): Promise<ProtoOAExecutionEvent> {
         const request = ProtoOACancelOrderReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
-            orderId
+            orderId,
         });
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_CANCEL_ORDER_REQ, ProtoOACancelOrderReq.encode(request).finish());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_CANCEL_ORDER_REQ,
+            ProtoOACancelOrderReq.encode(request).finish(),
+        );
 
-        return ProtoOAExecutionEvent.decode(response.payload ?? new Uint8Array());
+        return ProtoOAExecutionEvent.decode(
+            response.payload ?? new Uint8Array(),
+        );
     }
 
-    async closePosition(params: IClosePositionParams): Promise<ProtoOAExecutionEvent> {
+    async closePosition(
+        params: IClosePositionParams,
+    ): Promise<ProtoOAExecutionEvent> {
         const request = ProtoOAClosePositionReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             positionId: params.positionId,
-            volume: params.volume * SPOTWARE_VOLUME_SCALE
+            volume: params.volume * SPOTWARE_VOLUME_SCALE,
         });
 
         const response = await this.client.send(
             ProtoOAPayloadType.PROTO_OA_CLOSE_POSITION_REQ,
-            ProtoOAClosePositionReq.encode(request).finish()
+            ProtoOAClosePositionReq.encode(request).finish(),
         );
 
-        return ProtoOAExecutionEvent.decode(response.payload ?? new Uint8Array());
+        return ProtoOAExecutionEvent.decode(
+            response.payload ?? new Uint8Array(),
+        );
     }
 
     async getOpenPositionsAndOrders(): Promise<IOpenPositionsAndOrders> {
         const request = ProtoOAReconcileReq.fromPartial({
-            ctidTraderAccountId: this.client.ctidTraderAccountId
+            ctidTraderAccountId: this.client.ctidTraderAccountId,
         });
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ, ProtoOAReconcileReq.encode(request).finish());
-        const reconcile = ProtoOAReconcileRes.decode(response.payload ?? new Uint8Array());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_RECONCILE_REQ,
+            ProtoOAReconcileReq.encode(request).finish(),
+        );
+        const reconcile = ProtoOAReconcileRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return { positions: reconcile.position, orders: reconcile.order };
     }
 
-    private async placeOrder(params: PlaceOrderRequestParams): Promise<ProtoOAExecutionEvent> {
+    private async placeOrder(
+        params: PlaceOrderRequestParams,
+    ): Promise<ProtoOAExecutionEvent> {
         const request = ProtoOANewOrderReq.fromPartial({
             ctidTraderAccountId: this.client.ctidTraderAccountId,
             symbolId: params.symbolId,
@@ -284,22 +327,42 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
             comment: params.comment,
             label: params.label,
             clientOrderId: params.clientOrderId,
-            positionId: params.positionId
+            positionId: params.positionId,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ, encodeNewOrderReq(request));
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_NEW_ORDER_REQ,
+            encodeNewOrderReq(request),
+        );
 
-        return ProtoOAExecutionEvent.decode(response.payload ?? new Uint8Array());
+        return ProtoOAExecutionEvent.decode(
+            response.payload ?? new Uint8Array(),
+        );
     }
 
     private handleMessage(message: ProtoMessage): void {
-        if (message.payloadType === ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT) {
-            this.emit('execution', ProtoOAExecutionEvent.decode(message.payload ?? new Uint8Array()));
+        if (
+            message.payloadType === ProtoOAPayloadType.PROTO_OA_EXECUTION_EVENT
+        ) {
+            this.emit(
+                'execution',
+                ProtoOAExecutionEvent.decode(
+                    message.payload ?? new Uint8Array(),
+                ),
+            );
             return;
         }
 
-        if (message.payloadType === ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT) {
-            this.emit('orderError', ProtoOAOrderErrorEvent.decode(message.payload ?? new Uint8Array()));
+        if (
+            message.payloadType ===
+            ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT
+        ) {
+            this.emit(
+                'orderError',
+                ProtoOAOrderErrorEvent.decode(
+                    message.payload ?? new Uint8Array(),
+                ),
+            );
         }
     }
 }
@@ -309,8 +372,18 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
 // the order as missing them. See appendRequiredEnumIfDropped.
 function encodeNewOrderReq(request: ProtoOANewOrderReq): Uint8Array {
     const writer = ProtoOANewOrderReq.encode(request);
-    appendRequiredEnumIfDropped(writer, 4, request.orderType, ProtoOAOrderType.MARKET);
-    appendRequiredEnumIfDropped(writer, 5, request.tradeSide, ProtoOATradeSide.BUY);
+    appendRequiredEnumIfDropped(
+        writer,
+        4,
+        request.orderType,
+        ProtoOAOrderType.MARKET,
+    );
+    appendRequiredEnumIfDropped(
+        writer,
+        5,
+        request.tradeSide,
+        ProtoOATradeSide.BUY,
+    );
 
     return writer.finish();
 }

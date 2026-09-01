@@ -1,8 +1,22 @@
 import { randomUUID } from 'node:crypto';
 
-import { SpotwareOAuthClient, SpotwareSocketAuthenticator, type ISpotwareOAuthToken } from '../auth';
-import { TypedEventEmitter, type EventMap } from '../shared/typed-event-emitter';
-import { ProtoErrorRes, ProtoMessage, ProtoOAErrorRes, ProtoOAOrderErrorEvent, ProtoOAPayloadType, ProtoPayloadType } from '../types';
+import {
+    SpotwareOAuthClient,
+    SpotwareSocketAuthenticator,
+    type ISpotwareOAuthToken,
+} from '../auth';
+import {
+    TypedEventEmitter,
+    type EventMap,
+} from '../shared/typed-event-emitter';
+import {
+    ProtoErrorRes,
+    ProtoMessage,
+    ProtoOAErrorRes,
+    ProtoOAOrderErrorEvent,
+    ProtoOAPayloadType,
+    ProtoPayloadType,
+} from '../types';
 import type { SpotwareTransport } from '../transport';
 import { SpotwareRequestError } from './spotware-request-error';
 
@@ -65,16 +79,27 @@ export class SpotwareClient extends TypedEventEmitter<ISpotwareClientEvents> {
         this.clientSecret = options.clientSecret;
         this._ctidTraderAccountId = options.ctidTraderAccountId;
         this.token = options.token;
-        this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-        this.tokenRefreshBufferMs = options.tokenRefreshBufferMs ?? DEFAULT_TOKEN_REFRESH_BUFFER_MS;
-        this.authenticator = new SpotwareSocketAuthenticator(this.transport, { responseTimeoutMs: this.requestTimeoutMs });
+        this.requestTimeoutMs =
+            options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+        this.tokenRefreshBufferMs =
+            options.tokenRefreshBufferMs ?? DEFAULT_TOKEN_REFRESH_BUFFER_MS;
+        this.authenticator = new SpotwareSocketAuthenticator(this.transport, {
+            responseTimeoutMs: this.requestTimeoutMs,
+        });
 
         this.transport.on('connected', () => this.handleConnected());
         this.transport.on('message', (message) => this.handleMessage(message));
         this.transport.on('error', (error) => this.emit('error', error));
         this.transport.on('disconnected', (reason) => {
-            const message = reason === 'manual' ? 'The connection was closed' : 'The connection was lost';
-            this.rejectPendingRequests(new SpotwareRequestError(`${message} while waiting for a response`));
+            const message =
+                reason === 'manual'
+                    ? 'The connection was closed'
+                    : 'The connection was lost';
+            this.rejectPendingRequests(
+                new SpotwareRequestError(
+                    `${message} while waiting for a response`,
+                ),
+            );
         });
     }
 
@@ -91,7 +116,10 @@ export class SpotwareClient extends TypedEventEmitter<ISpotwareClientEvents> {
         return this.transport.disconnect();
     }
 
-    async send(payloadType: number, payload: Uint8Array): Promise<ProtoMessage> {
+    async send(
+        payloadType: number,
+        payload: Uint8Array,
+    ): Promise<ProtoMessage> {
         if (this.authenticationInFlight) {
             await this.authenticationInFlight;
         }
@@ -120,16 +148,30 @@ export class SpotwareClient extends TypedEventEmitter<ISpotwareClientEvents> {
                 reject: (error) => {
                     cleanup();
                     reject(error);
-                }
+                },
             });
 
             timeout = setTimeout(() => {
-                this.pendingRequests.get(clientMsgId)?.reject(new SpotwareRequestError(`Timed out waiting for a response to "${clientMsgId}"`));
+                this.pendingRequests
+                    .get(clientMsgId)
+                    ?.reject(
+                        new SpotwareRequestError(
+                            `Timed out waiting for a response to "${clientMsgId}"`,
+                        ),
+                    );
             }, this.requestTimeoutMs);
 
-            this.transport.send(ProtoMessage.fromPartial({ payloadType, payload, clientMsgId })).catch((error: Error) => {
-                this.pendingRequests.get(clientMsgId)?.reject(error);
-            });
+            this.transport
+                .send(
+                    ProtoMessage.fromPartial({
+                        payloadType,
+                        payload,
+                        clientMsgId,
+                    }),
+                )
+                .catch((error: Error) => {
+                    this.pendingRequests.get(clientMsgId)?.reject(error);
+                });
         });
     }
 
@@ -146,37 +188,69 @@ export class SpotwareClient extends TypedEventEmitter<ISpotwareClientEvents> {
 
     private async authenticate(): Promise<void> {
         await this.ensureValidToken();
-        await this.authenticator.authenticateApplication(this.clientId, this.clientSecret);
-        await this.authenticator.authenticateAccount(this._ctidTraderAccountId, this.token.accessToken);
+        await this.authenticator.authenticateApplication(
+            this.clientId,
+            this.clientSecret,
+        );
+        await this.authenticator.authenticateAccount(
+            this._ctidTraderAccountId,
+            this.token.accessToken,
+        );
         this.emit('authenticated');
     }
 
     private handleMessage(message: ProtoMessage): void {
         this.emit('message', message);
 
-        const pending = message.clientMsgId ? this.pendingRequests.get(message.clientMsgId) : undefined;
+        const pending = message.clientMsgId
+            ? this.pendingRequests.get(message.clientMsgId)
+            : undefined;
         if (!pending) {
             return;
         }
 
         if (message.payloadType === ProtoOAPayloadType.PROTO_OA_ERROR_RES) {
-            const error = ProtoOAErrorRes.decode(message.payload ?? new Uint8Array());
-            pending.reject(new SpotwareRequestError(error.description ?? error.errorCode, error.errorCode));
+            const error = ProtoOAErrorRes.decode(
+                message.payload ?? new Uint8Array(),
+            );
+            pending.reject(
+                new SpotwareRequestError(
+                    error.description ?? error.errorCode,
+                    error.errorCode,
+                ),
+            );
             return;
         }
 
         if (message.payloadType === ProtoPayloadType.ERROR_RES) {
-            const error = ProtoErrorRes.decode(message.payload ?? new Uint8Array());
-            pending.reject(new SpotwareRequestError(error.description ?? error.errorCode, error.errorCode));
+            const error = ProtoErrorRes.decode(
+                message.payload ?? new Uint8Array(),
+            );
+            pending.reject(
+                new SpotwareRequestError(
+                    error.description ?? error.errorCode,
+                    error.errorCode,
+                ),
+            );
             return;
         }
 
         // Order mutations (new/amend/cancel/close) have no dedicated _Res message: the outcome
         // arrives as an ExecutionEvent (success) or this event (failure), both carrying the
         // same clientMsgId. Without this, a rejected order would resolve as if it succeeded.
-        if (message.payloadType === ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT) {
-            const error = ProtoOAOrderErrorEvent.decode(message.payload ?? new Uint8Array());
-            pending.reject(new SpotwareRequestError(error.description ?? error.errorCode, error.errorCode));
+        if (
+            message.payloadType ===
+            ProtoOAPayloadType.PROTO_OA_ORDER_ERROR_EVENT
+        ) {
+            const error = ProtoOAOrderErrorEvent.decode(
+                message.payload ?? new Uint8Array(),
+            );
+            pending.reject(
+                new SpotwareRequestError(
+                    error.description ?? error.errorCode,
+                    error.errorCode,
+                ),
+            );
             return;
         }
 
@@ -214,7 +288,9 @@ export class SpotwareClient extends TypedEventEmitter<ISpotwareClientEvents> {
     }
 
     private async refreshToken(): Promise<void> {
-        this.token = await this.oauthClient.refreshAccessToken({ refreshToken: this.token.refreshToken });
+        this.token = await this.oauthClient.refreshAccessToken({
+            refreshToken: this.token.refreshToken,
+        });
         this.tokenIssuedAt = Date.now();
         this.emit('tokenRefreshed', this.token);
     }

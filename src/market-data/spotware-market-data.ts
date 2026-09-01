@@ -1,7 +1,10 @@
 import type { SpotwareClient } from '../client';
 import { appendRequiredEnumIfDropped } from '../shared/proto-required-field';
 import { SPOTWARE_PRICE_SCALE } from '../shared/spotware-scale';
-import { TypedEventEmitter, type EventMap } from '../shared/typed-event-emitter';
+import {
+    TypedEventEmitter,
+    type EventMap,
+} from '../shared/typed-event-emitter';
 import {
     ProtoMessage,
     ProtoOADepthEvent,
@@ -21,7 +24,7 @@ import {
     ProtoOATrendbarPeriod,
     ProtoOAUnsubscribeDepthQuotesReq,
     ProtoOAUnsubscribeLiveTrendbarReq,
-    ProtoOAUnsubscribeSpotsReq
+    ProtoOAUnsubscribeSpotsReq,
 } from '../types';
 import { SpotwareSymbolCatalog } from './spotware-symbol-catalog';
 
@@ -123,7 +126,10 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
     private readonly subscribedDepthSymbolIds = new Set<number>();
     // Keyed by symbolId:period so a symbol can carry several periods at once, which cTrader
     // treats as independent subscriptions.
-    private readonly subscribedTrendbars = new Map<string, ISubscribeLiveTrendbarsParams>();
+    private readonly subscribedTrendbars = new Map<
+        string,
+        ISubscribeLiveTrendbarsParams
+    >();
 
     constructor(client: SpotwareClient, symbolCatalog?: SpotwareSymbolCatalog) {
         super();
@@ -142,9 +148,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             ProtoOASubscribeSpotsReq.encode(
                 ProtoOASubscribeSpotsReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
-                    symbolId: [symbolId]
-                })
-            ).finish()
+                    symbolId: [symbolId],
+                }),
+            ).finish(),
         );
 
         this.subscribedSymbolIds.add(symbolId);
@@ -158,9 +164,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             ProtoOAUnsubscribeSpotsReq.encode(
                 ProtoOAUnsubscribeSpotsReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
-                    symbolId: [symbolId]
-                })
-            ).finish()
+                    symbolId: [symbolId],
+                }),
+            ).finish(),
         );
 
         this.subscribedSymbolIds.delete(symbolId);
@@ -171,7 +177,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
      * spot events, so this also requires an active spot subscription for the same symbol —
      * which this method takes care of on your behalf.
      */
-    async subscribeLiveTrendbars(params: ISubscribeLiveTrendbarsParams): Promise<void> {
+    async subscribeLiveTrendbars(
+        params: ISubscribeLiveTrendbarsParams,
+    ): Promise<void> {
         if (!this.subscribedSymbolIds.has(params.symbolId)) {
             await this.subscribe(params.symbolId);
         }
@@ -182,24 +190,26 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
                 ProtoOASubscribeLiveTrendbarReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
                     symbolId: params.symbolId,
-                    period: params.period
-                })
-            )
+                    period: params.period,
+                }),
+            ),
         );
 
         this.subscribedTrendbars.set(trendbarKey(params), { ...params });
     }
 
-    async unsubscribeLiveTrendbars(params: ISubscribeLiveTrendbarsParams): Promise<void> {
+    async unsubscribeLiveTrendbars(
+        params: ISubscribeLiveTrendbarsParams,
+    ): Promise<void> {
         await this.client.send(
             ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ,
             encodeUnsubscribeLiveTrendbarReq(
                 ProtoOAUnsubscribeLiveTrendbarReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
                     symbolId: params.symbolId,
-                    period: params.period
-                })
-            )
+                    period: params.period,
+                }),
+            ),
         );
 
         this.subscribedTrendbars.delete(trendbarKey(params));
@@ -214,9 +224,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             ProtoOASubscribeDepthQuotesReq.encode(
                 ProtoOASubscribeDepthQuotesReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
-                    symbolId: [symbolId]
-                })
-            ).finish()
+                    symbolId: [symbolId],
+                }),
+            ).finish(),
         );
 
         this.subscribedDepthSymbolIds.add(symbolId);
@@ -230,9 +240,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             ProtoOAUnsubscribeDepthQuotesReq.encode(
                 ProtoOAUnsubscribeDepthQuotesReq.fromPartial({
                     ctidTraderAccountId: this.client.ctidTraderAccountId,
-                    symbolId: [symbolId]
-                })
-            ).finish()
+                    symbolId: [symbolId],
+                }),
+            ).finish(),
         );
 
         this.subscribedDepthSymbolIds.delete(symbolId);
@@ -246,12 +256,17 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             period: params.period,
             fromTimestamp: params.fromTimestamp,
             toTimestamp: params.toTimestamp,
-            count: params.count
+            count: params.count,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ, encodeGetTrendbarsReq(request));
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_GET_TRENDBARS_REQ,
+            encodeGetTrendbarsReq(request),
+        );
 
-        return ProtoOAGetTrendbarsRes.decode(response.payload ?? new Uint8Array()).trendbar.map(toCleanTrendbar);
+        return ProtoOAGetTrendbarsRes.decode(
+            response.payload ?? new Uint8Array(),
+        ).trendbar.map(toCleanTrendbar);
     }
 
     /** Fetches raw historical ticks for one side of the book, newest first. */
@@ -261,15 +276,20 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             symbolId: params.symbolId,
             type: params.type,
             fromTimestamp: params.fromTimestamp,
-            toTimestamp: params.toTimestamp
+            toTimestamp: params.toTimestamp,
         });
 
-        const response = await this.client.send(ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ, encodeGetTickDataReq(request));
-        const decoded = ProtoOAGetTickDataRes.decode(response.payload ?? new Uint8Array());
+        const response = await this.client.send(
+            ProtoOAPayloadType.PROTO_OA_GET_TICKDATA_REQ,
+            encodeGetTickDataReq(request),
+        );
+        const decoded = ProtoOAGetTickDataRes.decode(
+            response.payload ?? new Uint8Array(),
+        );
 
         return {
             ticks: accumulateTickData(decoded.tickData),
-            hasMore: decoded.hasMore
+            hasMore: decoded.hasMore,
         };
     }
 
@@ -288,12 +308,16 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
 
     private handleMessage(message: ProtoMessage): void {
         if (message.payloadType === ProtoOAPayloadType.PROTO_OA_SPOT_EVENT) {
-            this.handleSpotEvent(ProtoOASpotEvent.decode(message.payload ?? new Uint8Array()));
+            this.handleSpotEvent(
+                ProtoOASpotEvent.decode(message.payload ?? new Uint8Array()),
+            );
             return;
         }
 
         if (message.payloadType === ProtoOAPayloadType.PROTO_OA_DEPTH_EVENT) {
-            this.handleDepthEvent(ProtoOADepthEvent.decode(message.payload ?? new Uint8Array()));
+            this.handleDepthEvent(
+                ProtoOADepthEvent.decode(message.payload ?? new Uint8Array()),
+            );
         }
     }
 
@@ -302,7 +326,7 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
             symbolId: event.symbolId,
             bid: toOptionalPrice(event.bid),
             ask: toOptionalPrice(event.ask),
-            timestamp: event.timestamp
+            timestamp: event.timestamp,
         });
 
         for (const trendbar of event.trendbar) {
@@ -314,7 +338,7 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
         this.emit('depth', {
             symbolId: event.symbolId,
             newQuotes: event.newQuotes.map(toCleanDepthQuote),
-            deletedQuoteIds: event.deletedQuotes
+            deletedQuoteIds: event.deletedQuotes,
         });
     }
 
@@ -337,9 +361,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
                 ProtoOASubscribeSpotsReq.encode(
                     ProtoOASubscribeSpotsReq.fromPartial({
                         ctidTraderAccountId: this.client.ctidTraderAccountId,
-                        symbolId
-                    })
-                ).finish()
+                        symbolId,
+                    }),
+                ).finish(),
             )
             .catch((error: Error) => this.emit('error', error));
     }
@@ -357,9 +381,9 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
                 ProtoOASubscribeDepthQuotesReq.encode(
                     ProtoOASubscribeDepthQuotesReq.fromPartial({
                         ctidTraderAccountId: this.client.ctidTraderAccountId,
-                        symbolId
-                    })
-                ).finish()
+                        symbolId,
+                    }),
+                ).finish(),
             )
             .catch((error: Error) => this.emit('error', error));
     }
@@ -373,11 +397,12 @@ export class SpotwareMarketData extends TypedEventEmitter<ISpotwareMarketDataEve
                     ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ,
                     encodeSubscribeLiveTrendbarReq(
                         ProtoOASubscribeLiveTrendbarReq.fromPartial({
-                            ctidTraderAccountId: this.client.ctidTraderAccountId,
+                            ctidTraderAccountId:
+                                this.client.ctidTraderAccountId,
                             symbolId: params.symbolId,
-                            period: params.period
-                        })
-                    )
+                            period: params.period,
+                        }),
+                    ),
                 )
                 .catch((error: Error) => this.emit('error', error));
         }
@@ -401,22 +426,41 @@ function trendbarKey(params: ISubscribeLiveTrendbarsParams): string {
 // common period to request — is dropped by ts-proto. See appendRequiredEnumIfDropped.
 function encodeGetTrendbarsReq(request: ProtoOAGetTrendbarsReq): Uint8Array {
     const writer = ProtoOAGetTrendbarsReq.encode(request);
-    appendRequiredEnumIfDropped(writer, 5, request.period, ProtoOATrendbarPeriod.M1);
+    appendRequiredEnumIfDropped(
+        writer,
+        5,
+        request.period,
+        ProtoOATrendbarPeriod.M1,
+    );
 
     return writer.finish();
 }
 
 // Same bug, different field number: `period` is field 3 on both live trendbar requests.
-function encodeSubscribeLiveTrendbarReq(request: ProtoOASubscribeLiveTrendbarReq): Uint8Array {
+function encodeSubscribeLiveTrendbarReq(
+    request: ProtoOASubscribeLiveTrendbarReq,
+): Uint8Array {
     const writer = ProtoOASubscribeLiveTrendbarReq.encode(request);
-    appendRequiredEnumIfDropped(writer, 3, request.period, ProtoOATrendbarPeriod.M1);
+    appendRequiredEnumIfDropped(
+        writer,
+        3,
+        request.period,
+        ProtoOATrendbarPeriod.M1,
+    );
 
     return writer.finish();
 }
 
-function encodeUnsubscribeLiveTrendbarReq(request: ProtoOAUnsubscribeLiveTrendbarReq): Uint8Array {
+function encodeUnsubscribeLiveTrendbarReq(
+    request: ProtoOAUnsubscribeLiveTrendbarReq,
+): Uint8Array {
     const writer = ProtoOAUnsubscribeLiveTrendbarReq.encode(request);
-    appendRequiredEnumIfDropped(writer, 3, request.period, ProtoOATrendbarPeriod.M1);
+    appendRequiredEnumIfDropped(
+        writer,
+        3,
+        request.period,
+        ProtoOATrendbarPeriod.M1,
+    );
 
     return writer.finish();
 }
@@ -437,12 +481,15 @@ function toCleanTrendbar(trendbar: ProtoOATrendbar): ITrendbar {
 
     return {
         period: trendbar.period ?? ProtoOATrendbarPeriod.M1,
-        timestamp: trendbar.utcTimestampInMinutes === undefined ? undefined : trendbar.utcTimestampInMinutes * 60_000,
+        timestamp:
+            trendbar.utcTimestampInMinutes === undefined
+                ? undefined
+                : trendbar.utcTimestampInMinutes * 60_000,
         low: low / SPOTWARE_PRICE_SCALE,
         open: (low + (trendbar.deltaOpen ?? 0)) / SPOTWARE_PRICE_SCALE,
         high: (low + (trendbar.deltaHigh ?? 0)) / SPOTWARE_PRICE_SCALE,
         close: (low + (trendbar.deltaClose ?? 0)) / SPOTWARE_PRICE_SCALE,
-        volume: trendbar.volume
+        volume: trendbar.volume,
     };
 }
 
@@ -451,7 +498,7 @@ function toCleanDepthQuote(quote: ProtoOADepthQuote): IDepthQuote {
         id: quote.id,
         size: quote.size,
         bid: toOptionalPrice(quote.bid),
-        ask: toOptionalPrice(quote.ask)
+        ask: toOptionalPrice(quote.ask),
     };
 }
 

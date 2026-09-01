@@ -3,11 +3,19 @@ import * as fs from 'node:fs/promises';
 import * as http from 'node:http';
 import * as path from 'node:path';
 
-import { SpotwareOAuthClient, SpotwareOAuthScope, SpotwareSocketAuthenticator, type ISpotwareOAuthToken } from '../../auth';
+import {
+    SpotwareOAuthClient,
+    SpotwareOAuthScope,
+    SpotwareSocketAuthenticator,
+    type ISpotwareOAuthToken,
+} from '../../auth';
 import { SpotwareClient } from '../../client';
 import { SpotwareHost, SpotwareTransport } from '../../transport';
 
-const TOKEN_FILE_PATH = path.resolve(__dirname, '../../../.spotware-token.json');
+const TOKEN_FILE_PATH = path.resolve(
+    __dirname,
+    '../../../.spotware-token.json',
+);
 const REDIRECT_PORT = Number(process.env.SPOTWARE__OAUTH_REDIRECT_PORT ?? 3939);
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
 
@@ -22,7 +30,9 @@ function requireEnv(name: string): string {
 
 async function readStoredToken(): Promise<ISpotwareOAuthToken | undefined> {
     try {
-        return JSON.parse(await fs.readFile(TOKEN_FILE_PATH, 'utf8')) as ISpotwareOAuthToken;
+        return JSON.parse(
+            await fs.readFile(TOKEN_FILE_PATH, 'utf8'),
+        ) as ISpotwareOAuthToken;
     } catch {
         return undefined;
     }
@@ -42,7 +52,11 @@ function waitForAuthorizationCode(port: number): Promise<string> {
             const errorParam = url.searchParams.get('error');
 
             response.writeHead(200, { 'Content-Type': 'text/html' });
-            response.end(errorParam ? '<p>Authorization failed. You can close this tab.</p>' : '<p>Authorized. You can close this tab.</p>');
+            response.end(
+                errorParam
+                    ? '<p>Authorization failed. You can close this tab.</p>'
+                    : '<p>Authorized. You can close this tab.</p>',
+            );
             server.close();
 
             if (errorParam) {
@@ -58,24 +72,40 @@ function waitForAuthorizationCode(port: number): Promise<string> {
     });
 }
 
-async function obtainToken(oauthClient: SpotwareOAuthClient): Promise<ISpotwareOAuthToken> {
+async function obtainToken(
+    oauthClient: SpotwareOAuthClient,
+): Promise<ISpotwareOAuthToken> {
     const stored = await readStoredToken();
     if (stored) {
-        console.log('Found a stored token, refreshing it (refresh tokens are single-use, so the file gets rewritten)...');
-        const refreshed = await oauthClient.refreshAccessToken({ refreshToken: stored.refreshToken });
+        console.log(
+            'Found a stored token, refreshing it (refresh tokens are single-use, so the file gets rewritten)...',
+        );
+        const refreshed = await oauthClient.refreshAccessToken({
+            refreshToken: stored.refreshToken,
+        });
         await writeStoredToken(refreshed);
 
         return refreshed;
     }
 
-    const authorizationUrl = oauthClient.buildAuthorizationUrl({ redirectUri: REDIRECT_URI, scope: SpotwareOAuthScope.TRADING });
-    console.log('No stored token found. Open this URL in a browser to authorize the app:\n');
+    const authorizationUrl = oauthClient.buildAuthorizationUrl({
+        redirectUri: REDIRECT_URI,
+        scope: SpotwareOAuthScope.TRADING,
+    });
+    console.log(
+        'No stored token found. Open this URL in a browser to authorize the app:\n',
+    );
     console.log(authorizationUrl);
     console.log(`\nWaiting for the redirect on ${REDIRECT_URI} ...`);
-    console.log(`(Make sure "${REDIRECT_URI}" is registered as a redirect URI on this app in the cTrader Open API portal.)`);
+    console.log(
+        `(Make sure "${REDIRECT_URI}" is registered as a redirect URI on this app in the cTrader Open API portal.)`,
+    );
 
     const code = await waitForAuthorizationCode(REDIRECT_PORT);
-    const token = await oauthClient.exchangeAuthorizationCode({ code, redirectUri: REDIRECT_URI });
+    const token = await oauthClient.exchangeAuthorizationCode({
+        code,
+        redirectUri: REDIRECT_URI,
+    });
     await writeStoredToken(token);
 
     return token;
@@ -84,9 +114,15 @@ async function obtainToken(oauthClient: SpotwareOAuthClient): Promise<ISpotwareO
 // Runs on a short-lived transport just to discover which demo account is linked to this
 // token — SpotwareClient itself needs a ctidTraderAccountId up front, so this has to happen
 // before it can be constructed.
-async function discoverDemoAccountId(clientId: string, clientSecret: string, accessToken: string): Promise<number> {
+async function discoverDemoAccountId(
+    clientId: string,
+    clientSecret: string,
+    accessToken: string,
+): Promise<number> {
     const transport = new SpotwareTransport({ host: SpotwareHost.DEMO });
-    transport.on('error', (error) => console.error('Discovery transport error:', error.message));
+    transport.on('error', (error) =>
+        console.error('Discovery transport error:', error.message),
+    );
     await transport.connect();
 
     const authenticator = new SpotwareSocketAuthenticator(transport);
@@ -98,13 +134,15 @@ async function discoverDemoAccountId(clientId: string, clientSecret: string, acc
         accounts.map((account) => ({
             ctidTraderAccountId: account.ctidTraderAccountId,
             isLive: account.isLive ?? false,
-            traderLogin: account.traderLogin
-        }))
+            traderLogin: account.traderLogin,
+        })),
     );
 
     const demoAccount = accounts.find((account) => !account.isLive);
     if (!demoAccount) {
-        throw new Error('No demo account is linked to this token. Link a demo account via cTrader before running this script.');
+        throw new Error(
+            'No demo account is linked to this token. Link a demo account via cTrader before running this script.',
+        );
     }
 
     await transport.disconnect();
@@ -123,19 +161,38 @@ export async function createAuthenticatedClient(): Promise<SpotwareClient> {
 
     const oauthClient = new SpotwareOAuthClient({ clientId, clientSecret });
     const token = await obtainToken(oauthClient);
-    const ctidTraderAccountId = await discoverDemoAccountId(clientId, clientSecret, token.accessToken);
+    const ctidTraderAccountId = await discoverDemoAccountId(
+        clientId,
+        clientSecret,
+        token.accessToken,
+    );
 
-    console.log(`\nConnecting SpotwareClient for demo account ${ctidTraderAccountId}...`);
+    console.log(
+        `\nConnecting SpotwareClient for demo account ${ctidTraderAccountId}...`,
+    );
     const transport = new SpotwareTransport({ host: SpotwareHost.DEMO });
-    const client = new SpotwareClient({ transport, oauthClient, clientId, clientSecret, ctidTraderAccountId, token });
+    const client = new SpotwareClient({
+        transport,
+        oauthClient,
+        clientId,
+        clientSecret,
+        ctidTraderAccountId,
+        token,
+    });
 
-    transport.on('reconnecting', (attempt, delayMs) => console.log(`Reconnecting (attempt ${attempt}) in ${delayMs}ms...`));
-    client.on('authenticated', () => console.log('Authenticated (application + account).'));
+    transport.on('reconnecting', (attempt, delayMs) =>
+        console.log(`Reconnecting (attempt ${attempt}) in ${delayMs}ms...`),
+    );
+    client.on('authenticated', () =>
+        console.log('Authenticated (application + account).'),
+    );
     client.on('tokenRefreshed', (refreshed) => {
         console.log('Access token refreshed.');
         void writeStoredToken(refreshed);
     });
-    client.on('error', (error) => console.error('Client error:', error.message));
+    client.on('error', (error) =>
+        console.error('Client error:', error.message),
+    );
 
     await client.connect();
 

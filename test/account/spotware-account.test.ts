@@ -13,12 +13,15 @@ import {
     ProtoOAPayloadType,
     ProtoOATrader,
     ProtoOATraderRes,
-    ProtoOATraderUpdatedEvent
+    ProtoOATraderUpdatedEvent,
 } from '../../src/types';
 import { createTestClient } from '../shared/create-test-client';
 import { TEST_ACCOUNT_ID } from '../shared/fake-spotware-server';
 
-function traderResponse(clientMsgId: string | undefined, trader: Partial<ProtoOATrader>): ProtoMessage {
+function traderResponse(
+    clientMsgId: string | undefined,
+    trader: Partial<ProtoOATrader>,
+): ProtoMessage {
     return ProtoMessage.fromPartial({
         payloadType: ProtoOAPayloadType.PROTO_OA_TRADER_RES,
         payload: ProtoOATraderRes.encode(
@@ -27,11 +30,11 @@ function traderResponse(clientMsgId: string | undefined, trader: Partial<ProtoOA
                 trader: ProtoOATrader.fromPartial({
                     ctidTraderAccountId: TEST_ACCOUNT_ID,
                     depositAssetId: 1,
-                    ...trader
-                })
-            })
+                    ...trader,
+                }),
+            }),
         ).finish(),
-        clientMsgId
+        clientMsgId,
     });
 }
 
@@ -46,7 +49,9 @@ describe('SpotwareAccount', () => {
 
     beforeEach(async () => {
         server = net.createServer();
-        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise<void>((resolve) =>
+            server.listen(0, '127.0.0.1', resolve),
+        );
         port = (server.address() as net.AddressInfo).port;
         createdClients = [];
     });
@@ -62,9 +67,9 @@ describe('SpotwareAccount', () => {
                 request.payloadType === ProtoOAPayloadType.PROTO_OA_TRADER_REQ
                     ? traderResponse(request.clientMsgId, {
                           balance: 10_053_099_944,
-                          moneyDigits: 8
+                          moneyDigits: 8,
                       })
-                    : undefined
+                    : undefined,
         });
         await client.connect();
         const account = new SpotwareAccount(client);
@@ -77,7 +82,7 @@ describe('SpotwareAccount', () => {
             onOtherRequest: (request) =>
                 request.payloadType === ProtoOAPayloadType.PROTO_OA_TRADER_REQ
                     ? traderResponse(request.clientMsgId, { balance: 250_000 })
-                    : undefined
+                    : undefined,
         });
         await client.connect();
         const account = new SpotwareAccount(client);
@@ -93,12 +98,12 @@ describe('SpotwareAccount', () => {
                           payloadType: ProtoOAPayloadType.PROTO_OA_TRADER_RES,
                           payload: ProtoOATraderRes.encode(
                               ProtoOATraderRes.fromPartial({
-                                  ctidTraderAccountId: TEST_ACCOUNT_ID
-                              })
+                                  ctidTraderAccountId: TEST_ACCOUNT_ID,
+                              }),
                           ).finish(),
-                          clientMsgId: request.clientMsgId
+                          clientMsgId: request.clientMsgId,
                       })
-                    : undefined
+                    : undefined,
         });
         await client.connect();
         const account = new SpotwareAccount(client);
@@ -111,14 +116,20 @@ describe('SpotwareAccount', () => {
 
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) => {
-                if (request.payloadType !== ProtoOAPayloadType.PROTO_OA_EXPECTED_MARGIN_REQ) {
+                if (
+                    request.payloadType !==
+                    ProtoOAPayloadType.PROTO_OA_EXPECTED_MARGIN_REQ
+                ) {
                     return undefined;
                 }
 
-                sentVolumes = ProtoOAExpectedMarginReq.decode(request.payload ?? new Uint8Array()).volume;
+                sentVolumes = ProtoOAExpectedMarginReq.decode(
+                    request.payload ?? new Uint8Array(),
+                ).volume;
 
                 return ProtoMessage.fromPartial({
-                    payloadType: ProtoOAPayloadType.PROTO_OA_EXPECTED_MARGIN_RES,
+                    payloadType:
+                        ProtoOAPayloadType.PROTO_OA_EXPECTED_MARGIN_RES,
                     payload: ProtoOAExpectedMarginRes.encode(
                         ProtoOAExpectedMarginRes.fromPartial({
                             ctidTraderAccountId: TEST_ACCOUNT_ID,
@@ -127,33 +138,37 @@ describe('SpotwareAccount', () => {
                                 {
                                     volume: 100_000,
                                     buyMargin: 33_150,
-                                    sellMargin: 33_100
-                                }
-                            ]
-                        })
+                                    sellMargin: 33_100,
+                                },
+                            ],
+                        }),
                     ).finish(),
-                    clientMsgId: request.clientMsgId
+                    clientMsgId: request.clientMsgId,
                 });
-            }
+            },
         });
         await client.connect();
         const account = new SpotwareAccount(client);
 
         const margins = await account.getExpectedMargin({
             symbolId: 1,
-            volumes: [1_000]
+            volumes: [1_000],
         });
 
         expect(sentVolumes).toEqual([100_000]);
-        expect(margins).toEqual([{ volume: 1_000, buyMargin: 331.5, sellMargin: 331 }]);
+        expect(margins).toEqual([
+            { volume: 1_000, buyMargin: 331.5, sellMargin: 331 },
+        ]);
     });
 
     it('converts unrealized PnL with the response exponent', async () => {
         const { client } = createTestClient(server, port, createdClients, {
             onOtherRequest: (request) =>
-                request.payloadType === ProtoOAPayloadType.PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQ
+                request.payloadType ===
+                ProtoOAPayloadType.PROTO_OA_GET_POSITION_UNREALIZED_PNL_REQ
                     ? ProtoMessage.fromPartial({
-                          payloadType: ProtoOAPayloadType.PROTO_OA_GET_POSITION_UNREALIZED_PNL_RES,
+                          payloadType:
+                              ProtoOAPayloadType.PROTO_OA_GET_POSITION_UNREALIZED_PNL_RES,
                           payload: ProtoOAGetPositionUnrealizedPnLRes.encode(
                               ProtoOAGetPositionUnrealizedPnLRes.fromPartial({
                                   ctidTraderAccountId: TEST_ACCOUNT_ID,
@@ -162,14 +177,14 @@ describe('SpotwareAccount', () => {
                                       {
                                           positionId: 9,
                                           grossUnrealizedPnL: -1_250,
-                                          netUnrealizedPnL: -1_310
-                                      }
-                                  ]
-                              })
+                                          netUnrealizedPnL: -1_310,
+                                      },
+                                  ],
+                              }),
                           ).finish(),
-                          clientMsgId: request.clientMsgId
+                          clientMsgId: request.clientMsgId,
                       })
-                    : undefined
+                    : undefined,
         });
         await client.connect();
         const account = new SpotwareAccount(client);
@@ -178,8 +193,8 @@ describe('SpotwareAccount', () => {
             {
                 positionId: 9,
                 grossUnrealizedPnL: -12.5,
-                netUnrealizedPnL: -13.1
-            }
+                netUnrealizedPnL: -13.1,
+            },
         ]);
     });
 
@@ -190,7 +205,9 @@ describe('SpotwareAccount', () => {
         const socket = await socketPromise;
 
         const account = new SpotwareAccount(harness.client);
-        const updated = new Promise<ProtoOATrader>((resolve) => account.on('traderUpdated', resolve));
+        const updated = new Promise<ProtoOATrader>((resolve) =>
+            account.on('traderUpdated', resolve),
+        );
 
         const { encodeFrame } = await import('../../src/transport/frame-codec');
         socket.write(
@@ -204,13 +221,13 @@ describe('SpotwareAccount', () => {
                                 trader: ProtoOATrader.fromPartial({
                                     ctidTraderAccountId: TEST_ACCOUNT_ID,
                                     balance: 500_000,
-                                    depositAssetId: 1
-                                })
-                            })
-                        ).finish()
-                    )
-                ).finish()
-            )
+                                    depositAssetId: 1,
+                                }),
+                            }),
+                        ).finish(),
+                    ),
+                ).finish(),
+            ),
         );
 
         expect((await updated).balance).toBe(500_000);
@@ -223,7 +240,9 @@ describe('SpotwareAccount', () => {
         const socket = await socketPromise;
 
         const account = new SpotwareAccount(harness.client);
-        const changed = new Promise<{ positionId: number; usedMargin: number }>((resolve) => account.on('marginChanged', resolve));
+        const changed = new Promise<{ positionId: number; usedMargin: number }>(
+            (resolve) => account.on('marginChanged', resolve),
+        );
 
         const { encodeFrame } = await import('../../src/transport/frame-codec');
         socket.write(
@@ -236,12 +255,12 @@ describe('SpotwareAccount', () => {
                                 ctidTraderAccountId: TEST_ACCOUNT_ID,
                                 positionId: 42,
                                 usedMargin: 33_150,
-                                moneyDigits: 2
-                            })
-                        ).finish()
-                    )
-                ).finish()
-            )
+                                moneyDigits: 2,
+                            }),
+                        ).finish(),
+                    ),
+                ).finish(),
+            ),
         );
 
         expect(await changed).toEqual({ positionId: 42, usedMargin: 331.5 });
@@ -254,8 +273,11 @@ describe('SpotwareAccount', () => {
         const socket = await socketPromise;
 
         const account = new SpotwareAccount(harness.client);
-        const invalidated = new Promise<[number[], string | undefined]>((resolve) =>
-            account.on('tokenInvalidated', (accountIds, reason) => resolve([accountIds, reason]))
+        const invalidated = new Promise<[number[], string | undefined]>(
+            (resolve) =>
+                account.on('tokenInvalidated', (accountIds, reason) =>
+                    resolve([accountIds, reason]),
+                ),
         );
 
         const { encodeFrame } = await import('../../src/transport/frame-codec');
@@ -267,14 +289,17 @@ describe('SpotwareAccount', () => {
                         ProtoOAAccountsTokenInvalidatedEvent.encode(
                             ProtoOAAccountsTokenInvalidatedEvent.fromPartial({
                                 ctidTraderAccountIds: [TEST_ACCOUNT_ID],
-                                reason: 'ACCESS_REVOKED'
-                            })
-                        ).finish()
-                    )
-                ).finish()
-            )
+                                reason: 'ACCESS_REVOKED',
+                            }),
+                        ).finish(),
+                    ),
+                ).finish(),
+            ),
         );
 
-        expect(await invalidated).toEqual([[TEST_ACCOUNT_ID], 'ACCESS_REVOKED']);
+        expect(await invalidated).toEqual([
+            [TEST_ACCOUNT_ID],
+            'ACCESS_REVOKED',
+        ]);
     });
 });
