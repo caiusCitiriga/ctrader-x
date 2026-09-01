@@ -1,7 +1,27 @@
 {
-    "cSpell.words": [
-        "ctrader",
-        "ctraderapi",
-        "spotware"
-    ]
+    "cSpell.words": ["ctrader", "ctraderapi", "spotware"],
+
+    // Formatting is defined by .prettierrc and nothing else. These settings only route the
+    // editor to Prettier; they deliberately set no style options of their own, so the CLI
+    // (`npm run format`) and the pre-commit hook always agree with what you see on save.
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[markdown]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+    "[yaml]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+    // Never format a file Prettier has no config for: without this the extension silently
+    // falls back to its own defaults plus any prettier.* editor settings, which is exactly
+    // how a codebase drifts away from its own .prettierrc.
+    "prettier.requireConfig": true,
+
+    // Use the prettier from devDependencies, so the editor cannot format with a different
+    // version than the CLI and the hook do.
+    "prettier.prettierPath": "./node_modules/prettier",
+
+    // .prettierrc owns indentation; guessing from the file would override it.
+    "editor.detectIndentation": false
 }

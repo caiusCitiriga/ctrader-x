@@ -25,7 +25,7 @@
     },
     "homepage": "https://github.com/caiusCitiriga/ctrader-x#readme",
     "scripts": {
-        "prepare": "tsc",
+        "prepare": "tsc && husky",
         "build": "tsc",
         "watch": "tsc --watch",
         "start:prod": "node dist/example/example.js",
@@ -37,6 +37,8 @@
         "start:history": "ts-node src/example/history-example.ts",
         "start:streaming": "ts-node src/example/streaming-example.ts",
         "start:position-stops": "ts-node src/example/position-stops-example.ts",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
         "test": "vitest run",
         "test:watch": "vitest",
         "generate:types": "grpc_tools_node_protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/types/generated --ts_proto_opt=esModuleInterop=true,outputServices=none,useOptionals=messages,unrecognizedEnum=false -I proto proto/OpenApiCommonModelMessages.proto proto/OpenApiCommonMessages.proto proto/OpenApiModelMessages.proto proto/OpenApiMessages.proto"
@@ -50,11 +52,6 @@
     "author": "Caius Citiriga",
     "license": "MIT",
     "description": "Robust cTrader client, with a friendly API",
-    "husky": {
-        "hooks": {
-            "pre-commit": "pretty-quick --staged"
-        }
-    },
     "devDependencies": {
         "@types/node": "^20.19.43",
         "grpc-tools": "^1.13.0",

@@ -1,0 +1,14 @@
+# Build output
+dist
+
+# Generated from proto/ by `npm run generate:types` — reformatting it here would be
+# undone on the next regeneration, and the diff would drown every real change.
+src/types/generated
+
+# Not ours to style
+node_modules
+package-lock.json
+proto
+
+# Local, gitignored
+.spotware-token.json
