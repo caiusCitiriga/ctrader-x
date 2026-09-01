@@ -10,6 +10,14 @@
   A TypeScript SDK for cTrader's Open API — connect, authenticate, stream prices, and trade, with automatic reconnection built in.
 </p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/npm/v/ctrader-x" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/npm/dm/ctrader-x" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/ctrader-x"><img src="https://img.shields.io/node/v/ctrader-x" alt="node version"></a>
+  <img src="https://img.shields.io/npm/types/ctrader-x" alt="TypeScript types">
+  <a href="https://github.com/caiusCitiriga/ctrader-x/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/ctrader-x" alt="license"></a>
+</p>
+
 ## Why
 
 There is no official Spotware SDK for Node.js/TypeScript; official support covers mainly C# and Python. The main community alternative, Mida, went closed-source. Developers integrating the Open API directly hit real, documented friction: a raw TCP/Protobuf protocol with manual message framing, a delegated OAuth2 handshake, and enough moving parts that getting from zero to a connected, authenticated, streaming client takes real effort.

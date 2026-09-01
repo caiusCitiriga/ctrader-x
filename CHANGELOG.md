@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The README now opens with the project logo instead of a plain `# CTrader-x` heading. Two variants are swapped via `<picture>` and `prefers-color-scheme`, because the wordmark is near-invisible against the wrong background. The image sources are absolute `raw.githubusercontent.com` URLs rather than repository-relative paths: `files` limits the published tarball to `dist`, so npm has no local copy of the assets and must resolve the path on its own. Documentation only — no code changes.
+- The README now opens with a centered header — project logo, tagline, and status badges — instead of a plain `# CTrader-x` heading. Two logo variants are swapped via `<picture>` and `prefers-color-scheme`, because the wordmark is near-invisible against the wrong background. Image and link targets are absolute `raw.githubusercontent.com`/`github.com` URLs rather than repository-relative paths: `files` limits the published tarball to `dist`, so npm has no local copy of the assets and must resolve the paths on its own. Badges (version, downloads, supported Node, types, license) are registry-derived and need no CI.
+- The lockfile was pinned at `0.3.0` and missing the `engines` constraint — it was never updated when `0.3.1` was released. Regenerated so it matches `package.json`. No dependency versions changed.
+
+Documentation and packaging metadata only — no code changes.
 
 ## [0.3.1] - 2026-08-30
 
