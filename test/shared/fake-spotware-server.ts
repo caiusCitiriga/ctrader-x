@@ -7,8 +7,12 @@ import {
     ProtoOAApplicationAuthRes,
     ProtoOALightSymbol,
     ProtoOAPayloadType,
+    ProtoOASubscribeDepthQuotesRes,
+    ProtoOASubscribeLiveTrendbarRes,
     ProtoOASubscribeSpotsRes,
     ProtoOASymbolsListRes,
+    ProtoOAUnsubscribeDepthQuotesRes,
+    ProtoOAUnsubscribeLiveTrendbarRes,
     ProtoOAUnsubscribeSpotsRes
 } from '../../src/types';
 
@@ -62,26 +66,81 @@ function buildResponse(request: ProtoMessage, symbols: ProtoOALightSymbol[]): Pr
         case ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_REQ:
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_ACCOUNT_AUTH_RES,
-                payload: ProtoOAAccountAuthRes.encode(ProtoOAAccountAuthRes.fromPartial({ ctidTraderAccountId: TEST_ACCOUNT_ID })).finish()
+                payload: ProtoOAAccountAuthRes.encode(
+                    ProtoOAAccountAuthRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish()
             });
         case ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_REQ:
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_SYMBOLS_LIST_RES,
                 payload: ProtoOASymbolsListRes.encode(
-                    ProtoOASymbolsListRes.fromPartial({ ctidTraderAccountId: TEST_ACCOUNT_ID, symbol: symbols })
+                    ProtoOASymbolsListRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID,
+                        symbol: symbols
+                    })
                 ).finish(),
                 clientMsgId: request.clientMsgId
             });
         case ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_REQ:
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_SPOTS_RES,
-                payload: ProtoOASubscribeSpotsRes.encode(ProtoOASubscribeSpotsRes.fromPartial({ ctidTraderAccountId: TEST_ACCOUNT_ID })).finish(),
+                payload: ProtoOASubscribeSpotsRes.encode(
+                    ProtoOASubscribeSpotsRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
+                clientMsgId: request.clientMsgId
+            });
+        case ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_REQ:
+            return ProtoMessage.fromPartial({
+                payloadType: ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_LIVE_TRENDBAR_RES,
+                payload: ProtoOASubscribeLiveTrendbarRes.encode(
+                    ProtoOASubscribeLiveTrendbarRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
+                clientMsgId: request.clientMsgId
+            });
+        case ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_REQ:
+            return ProtoMessage.fromPartial({
+                payloadType: ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_LIVE_TRENDBAR_RES,
+                payload: ProtoOAUnsubscribeLiveTrendbarRes.encode(
+                    ProtoOAUnsubscribeLiveTrendbarRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
+                clientMsgId: request.clientMsgId
+            });
+        case ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_REQ:
+            return ProtoMessage.fromPartial({
+                payloadType: ProtoOAPayloadType.PROTO_OA_SUBSCRIBE_DEPTH_QUOTES_RES,
+                payload: ProtoOASubscribeDepthQuotesRes.encode(
+                    ProtoOASubscribeDepthQuotesRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
+                clientMsgId: request.clientMsgId
+            });
+        case ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_REQ:
+            return ProtoMessage.fromPartial({
+                payloadType: ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_DEPTH_QUOTES_RES,
+                payload: ProtoOAUnsubscribeDepthQuotesRes.encode(
+                    ProtoOAUnsubscribeDepthQuotesRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
                 clientMsgId: request.clientMsgId
             });
         case ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_SPOTS_REQ:
             return ProtoMessage.fromPartial({
                 payloadType: ProtoOAPayloadType.PROTO_OA_UNSUBSCRIBE_SPOTS_RES,
-                payload: ProtoOAUnsubscribeSpotsRes.encode(ProtoOAUnsubscribeSpotsRes.fromPartial({ ctidTraderAccountId: TEST_ACCOUNT_ID })).finish(),
+                payload: ProtoOAUnsubscribeSpotsRes.encode(
+                    ProtoOAUnsubscribeSpotsRes.fromPartial({
+                        ctidTraderAccountId: TEST_ACCOUNT_ID
+                    })
+                ).finish(),
                 clientMsgId: request.clientMsgId
             });
         default:

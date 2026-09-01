@@ -1,5 +1,7 @@
+export * from './account';
 export * from './auth';
 export * from './client';
+export * from './history';
 export * from './market-data';
 export * from './shared';
 export * from './trading';

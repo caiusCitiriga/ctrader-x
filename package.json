@@ -1,8 +1,15 @@
 {
     "name": "ctrader-x",
-    "version": "0.3.2",
+    "version": "0.4.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json"
+    },
     "files": [
         "dist"
     ],
@@ -26,6 +33,10 @@
         "start:market-data": "ts-node src/example/market-data-example.ts",
         "start:trading": "ts-node src/example/trading-example.ts",
         "start:trendbars": "ts-node src/example/trendbars-example.ts",
+        "start:account": "ts-node src/example/account-example.ts",
+        "start:history": "ts-node src/example/history-example.ts",
+        "start:streaming": "ts-node src/example/streaming-example.ts",
+        "start:position-stops": "ts-node src/example/position-stops-example.ts",
         "test": "vitest run",
         "test:watch": "vitest",
         "generate:types": "grpc_tools_node_protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/types/generated --ts_proto_opt=esModuleInterop=true,outputServices=none,useOptionals=messages,unrecognizedEnum=false -I proto proto/OpenApiCommonModelMessages.proto proto/OpenApiCommonMessages.proto proto/OpenApiModelMessages.proto proto/OpenApiMessages.proto"

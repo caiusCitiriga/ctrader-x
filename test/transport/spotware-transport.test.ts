@@ -28,7 +28,12 @@ describe('SpotwareTransport', () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
     });
 
-    function createTransport(overrides: { socketFactory?: SpotwareSocketFactory; staleConnectionTimeoutMs?: number } = {}): SpotwareTransport {
+    function createTransport(
+        overrides: {
+            socketFactory?: SpotwareSocketFactory;
+            staleConnectionTimeoutMs?: number;
+        } = {}
+    ): SpotwareTransport {
         return new SpotwareTransport({
             host: SpotwareHost.DEMO,
             port,
@@ -65,7 +70,12 @@ describe('SpotwareTransport', () => {
         const transport = createTransport();
         await transport.connect();
 
-        await transport.send(ProtoMessage.fromPartial({ payloadType: ProtoPayloadType.HEARTBEAT_EVENT, clientMsgId: 'test-1' }));
+        await transport.send(
+            ProtoMessage.fromPartial({
+                payloadType: ProtoPayloadType.HEARTBEAT_EVENT,
+                clientMsgId: 'test-1'
+            })
+        );
 
         const decoded = ProtoMessage.decode(await received);
         expect(decoded.payloadType).toBe(ProtoPayloadType.HEARTBEAT_EVENT);
@@ -83,7 +93,10 @@ describe('SpotwareTransport', () => {
         await transport.connect();
         const serverSocket = await connectionReceived;
 
-        const outbound = ProtoMessage.fromPartial({ payloadType: ProtoPayloadType.PROTO_MESSAGE, clientMsgId: 'from-server' });
+        const outbound = ProtoMessage.fromPartial({
+            payloadType: ProtoPayloadType.PROTO_MESSAGE,
+            clientMsgId: 'from-server'
+        });
         serverSocket.write(encodeFrame(ProtoMessage.encode(outbound).finish()));
 
         const received = await messageReceived;
@@ -126,7 +139,9 @@ describe('SpotwareTransport', () => {
 
         serverSocket.destroy();
 
-        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), { timeout: 2000 });
+        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
+            timeout: 2000
+        });
 
         expect(disconnected).toHaveBeenCalledWith('dropped');
         expect(reconnecting).toHaveBeenCalledTimes(1);
@@ -139,7 +154,9 @@ describe('SpotwareTransport', () => {
             throw new Error('simulated DNS failure');
         };
 
-        const transport = createTransport({ socketFactory: alwaysFailingFactory });
+        const transport = createTransport({
+            socketFactory: alwaysFailingFactory
+        });
         const reconnecting = vi.fn();
         transport.on('reconnecting', reconnecting);
         transport.on('error', () => undefined);
@@ -184,7 +201,9 @@ describe('SpotwareTransport', () => {
         serverSocket.destroy();
         await secondServerConnection;
 
-        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), { timeout: 3000 });
+        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
+            timeout: 3000
+        });
         // 3 reconnect attempts scheduled: the 2 that failed, plus the 1 that finally succeeded.
         expect(reconnecting.mock.calls.length).toBeGreaterThanOrEqual(3);
 
@@ -207,9 +226,34 @@ describe('SpotwareTransport', () => {
         await transport.connect();
         await firstServerConnection;
 
-        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), { timeout: 2000 });
+        await vi.waitFor(() => expect(connected).toHaveBeenCalledTimes(2), {
+            timeout: 2000
+        });
         expect(reconnecting).toHaveBeenCalledTimes(1);
 
         await transport.disconnect();
+    });
+
+    it('destroys a connection that completes after disconnect() was already called', async () => {
+        let releaseSocket: ((socket: net.Socket) => void) | undefined;
+        const transport = new SpotwareTransport({
+            host: SpotwareHost.DEMO,
+            port,
+            socketFactory: () => new Promise<net.Socket>((resolve) => (releaseSocket = resolve))
+        });
+        transport.on('error', () => undefined);
+
+        // disconnect() lands while the socket is still being established, so it finds nothing
+        // to destroy. Without the attempt cleaning up after itself, the socket that arrives
+        // next goes live with its heartbeat and watchdog running and nothing ever closes it.
+        const connecting = transport.connect().catch(() => undefined);
+        await transport.disconnect();
+
+        const socket = net.connect(port, '127.0.0.1');
+        await new Promise<void>((resolve) => socket.once('connect', () => resolve()));
+        releaseSocket?.(socket);
+        await connecting;
+
+        await vi.waitFor(() => expect(socket.destroyed).toBe(true));
     });
 });

@@ -156,6 +156,15 @@ export class SpotwareTransport extends TypedEventEmitter<ISpotwareTransportEvent
             throw error;
         }
 
+        // disconnect() can land while the socket is still being established: it finds no socket
+        // to destroy and returns straight away, so this attempt has to clean up after itself.
+        // Otherwise an explicit disconnect leaves a live socket with its heartbeat and watchdog
+        // running, and the process never becomes idle.
+        if (this.disconnectRequested) {
+            socket.destroy();
+            return;
+        }
+
         this.socket = socket;
         this.hasConnectedOnce = true;
         this.reconnectAttempt = 0;

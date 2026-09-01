@@ -35,6 +35,12 @@ async function main(): Promise<void> {
     // same public SpotwareSymbolCatalog a consumer could use standalone.
     const marketData = new SpotwareMarketData(client);
 
+    // Awaiting a call tells you the request was accepted. What happens to the order afterwards
+    // — a pending order filling later, a stop-loss triggering overnight — arrives unsolicited,
+    // so anything long-running listens here rather than relying on the returned promise alone.
+    trading.on('execution', (event) => console.log(`  [execution] type=${event.executionType} order=${event.order?.orderId ?? '-'}`));
+    trading.on('orderError', (event) => console.log(`  [orderError] ${event.errorCode}: ${event.description}`));
+
     console.log('\nOpen positions:');
     const { positions, orders } = await trading.getOpenPositionsAndOrders();
     console.table(
@@ -46,7 +52,13 @@ async function main(): Promise<void> {
         }))
     );
     console.log('Pending orders:');
-    console.table(orders.map((order) => ({ orderId: order.orderId, status: order.orderStatus, type: order.orderType })));
+    console.table(
+        orders.map((order) => ({
+            orderId: order.orderId,
+            status: order.orderStatus,
+            type: order.orderType
+        }))
+    );
 
     const symbol = await marketData.symbols.findByName(SYMBOL_NAME);
     if (!symbol) {
@@ -81,6 +93,25 @@ async function main(): Promise<void> {
     console.log('Cancelling it...');
     const cancellation = await trading.cancelOrder(orderId);
     console.log(`Cancelled (executionType=${cancellation.executionType}).`);
+
+    // A stop entry order, 10% above the market so it stays pending just like the limit above.
+    const stopPrice = Number((bid * 1.1).toFixed(5));
+    console.log(`\nPlacing a BUY stop order at ${stopPrice} (won't trigger)...`);
+    const stopExecution = await trading.placeStopOrder({
+        symbolId: symbol.symbolId,
+        tradeSide: ProtoOATradeSide.BUY,
+        volume: ORDER_VOLUME_UNITS,
+        stopPrice,
+        comment: 'ctrader-x trading example — safe to cancel'
+    });
+
+    const stopOrderId = stopExecution.order?.orderId;
+    console.log(`Stop order placed (executionType=${stopExecution.executionType}), orderId=${stopOrderId}`);
+
+    if (stopOrderId !== undefined) {
+        const stopCancellation = await trading.cancelOrder(stopOrderId);
+        console.log(`Cancelled (executionType=${stopCancellation.executionType}).`);
+    }
 
     await client.disconnect();
 }

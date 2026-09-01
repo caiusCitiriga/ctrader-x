@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-01
+
+### Added
+
+- **Unsolicited server events, typed and per module.** The SDK previously surfaced one of the thirteen event types cTrader pushes on its own (`ProtoOASpotEvent`); everything else reached callers only as an undecoded `client.on('message')` payload. `SpotwareTrading` now emits `execution` and `orderError`, and a new `SpotwareAccount` emits `traderUpdated`, `marginChanged`, `marginCallTriggered`, `marginCallUpdated`, `accountDisconnected` and `tokenInvalidated`. This is what lets a long-running process see a pending order filling twenty minutes later or a stop-loss triggering overnight — awaiting a place/amend/close call only ever told you the request was _accepted_. Events sit on the module that owns them to preserve the one-way dependency rule, so an event is only delivered if that module has been constructed; `client.on('message')` remains the single-stream escape hatch.
+- **`SpotwareAccount`** — `getTrader`, `getBalance`, `getAssets`, `getExpectedMargin`, `getPositionsUnrealizedPnL`, `getMarginCalls`. Balance and margin were previously unreachable, which made position sizing impossible without a second data source. Monetary values are converted with the `moneyDigits` exponent from the response that carried them, since the exponent is per-response rather than fixed like price and volume.
+- **`SpotwareHistory`** — `getDeals`, `getDealsByPositionId`, `getOrders`, `getCashFlow`. The server's `hasMore` paging flag is surfaced rather than swallowed, as it is the caller's only signal that a range needs narrowing. `getCashFlow` rejects a range wider than one week locally, matching cTrader's own documented cap.
+- **`SpotwareTrading.amendPositionStopLossTakeProfit`** — moves the stops on an already-open position. `amendOrder` targets pending orders, so trailing a stop or moving one to breakeven had no API at all.
+- **The remaining order types** — `placeStopOrder`, `placeStopLimitOrder`, `placeMarketRangeOrder`. `placeOrder` was private, so `STOP`, `STOP_LIMIT` and `MARKET_RANGE` were unreachable despite already being modelled. Order placement also accepts `trailingStopLoss`, `guaranteedStopLoss`, `stopTriggerMethod`, `clientOrderId` and `positionId`.
+- **`SpotwareMarketData` streaming and history** — `subscribeLiveTrendbars`/`unsubscribeLiveTrendbars`, `subscribeDepth`/`unsubscribeDepth`, and `getTickData`. Live bars and depth are restored after a reconnect alongside spot subscriptions. Because cTrader carries live bars inside spot events rather than as their own message, `subscribeLiveTrendbars` also subscribes to spots — without one, the subscription is accepted and then silently produces nothing. Historical ticks are delta-encoded in both timestamp and price, and are accumulated back into absolute values (verified against a live demo account, since the field comments only document the timestamp).
+- An `exports` map, so the package resolves correctly under modern Node and bundler resolution. The build remains CommonJS.
+
+### Fixed
+
+- **A spot event's unchanged side was reported as a price of `0` instead of as absent.** cTrader omits the side that did not move, and ts-proto decodes an omitted optional scalar as `0` rather than `undefined`, so the previous `=== undefined` check never fired: a bid-only tick — the common case — emitted `ask: 0`. Anything computing a spread or a mid from it silently got a plausible-looking wrong number. Prices are now reported as `undefined` when absent, in both spot and depth updates, on the grounds that zero is not a real quote. The same reasoning applies to `moneyDigits`, where an explicit `0` and an omitted field are byte-identical on the wire and both mean "unspecified".
+- **`disconnect()` could leak a live connection.** If it was called while a socket was still being established — the realistic case being a shutdown during a reconnect — it found no socket to destroy and returned immediately, and the connection that arrived a moment later went live with its heartbeat and liveness watchdog running, with nothing holding a reference to close it. The process would then never go idle. A connection attempt that completes after a disconnect now destroys its own socket. Found via an intermittently hanging test rather than by inspection.
+- Four more instances of the `required`-field-at-its-implicit-default bug that already affected `orderType`, `tradeSide` and `period`: ts-proto drops the field and the server rejects the message. Confirmed by inspecting raw wire bytes for `subscribeLiveTrendbar.period` and `unsubscribeLiveTrendbar.period` at `M1`, `getTickData.type` at `BID`, and `cashFlowHistory.fromTimestamp` at `0` — each the value a caller would most plausibly pass. The workaround is now a shared helper rather than copied per module.
+
+### Changed
+
+- The README documents events, account state, history, the new order types and streaming, and states explicitly that events live on their owning module rather than in one central place.
+- New runnable examples: `start:account`, `start:history`, `start:streaming` and `start:position-stops`. All were executed end-to-end against a live demo account. `start:position-stops` is the only one that genuinely opens a position, which is unavoidable for demonstrating a stop move; it uses the broker's minimum volume and closes what it opens.
+
 ## [0.3.2] - 2026-09-01
 
 ### Changed
