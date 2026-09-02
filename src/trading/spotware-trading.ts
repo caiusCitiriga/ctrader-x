@@ -23,6 +23,7 @@ import {
     ProtoOAReconcileRes,
     ProtoOATimeInForce,
     ProtoOATradeSide,
+    ProtoOATrailingSLChangedEvent,
 } from '../types';
 
 export interface IPlaceMarketOrderParams {
@@ -118,6 +119,13 @@ export interface ISpotwareTradingEvents extends EventMap {
      * such as a pending order the broker refuses to trigger.
      */
     orderError: [event: ProtoOAOrderErrorEvent];
+    /**
+     * The broker moved a position's trailing stop-loss. `amendPositionStopLossTakeProfit` and
+     * `placeOrder`'s `trailingStopLoss` flag only turn trailing on — the broker then re-prices
+     * the stop on its own as the market moves, with no request of yours to await. Without this
+     * event, the new stop price is only discoverable by polling `getOpenPositionsAndOrders`.
+     */
+    trailingStopLossChanged: [event: ProtoOATrailingSLChangedEvent];
 }
 
 // The internal superset of every wire field the public place* helpers can set, so each helper
@@ -360,6 +368,19 @@ export class SpotwareTrading extends TypedEventEmitter<ISpotwareTradingEvents> {
             this.emit(
                 'orderError',
                 ProtoOAOrderErrorEvent.decode(
+                    message.payload ?? new Uint8Array(),
+                ),
+            );
+            return;
+        }
+
+        if (
+            message.payloadType ===
+            ProtoOAPayloadType.PROTO_OA_TRAILING_SL_CHANGED_EVENT
+        ) {
+            this.emit(
+                'trailingStopLossChanged',
+                ProtoOATrailingSLChangedEvent.decode(
                     message.payload ?? new Uint8Array(),
                 ),
             );

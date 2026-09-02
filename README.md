@@ -114,6 +114,8 @@ const token = await oauthClient.exchangeAuthorizationCode({
 
 Step 4 (listing accounts) needs a connected `SpotwareTransport` and a `SpotwareSocketAuthenticator` — rather than duplicate that here, see [`src/example/shared/create-authenticated-client.ts`](src/example/shared/create-authenticated-client.ts) for the complete, runnable version: capturing the redirect with a local HTTP server, discovering linked accounts, and persisting the token to disk. Refresh tokens are single-use, so save the replacement `token` every time `client.on('tokenRefreshed', ...)` fires, or the next run will fail.
 
+**What the library does and doesn't do with the token.** `SpotwareClient` tracks expiry and refreshes the access token in memory on its own — you never have to call `refreshAccessToken` yourself in normal use. What it does **not** do is persist the token anywhere: there's no file, database, or storage of any kind inside the library. `token` is just a value you pass in on `new SpotwareClient({ ..., token })` and get handed back via `tokenRefreshed`; where it lives between process restarts (a file, a secrets manager, a database row) is entirely up to you. This is deliberate, not an oversight — a single-user local bot and a multi-tenant service have completely different storage needs, and the SDK has no way to guess which one applies. The example above shows the simplest case: a JSON file on disk.
+
 ## Architecture
 
 Dependencies only flow one direction, top to bottom in this table: the domain modules depend on `client`, which depends on `transport` and `auth`, which depends on `types`. It never goes the other way — `types` has no idea `trading` exists.
@@ -263,6 +265,7 @@ Awaiting a call tells you the request was **accepted**. What happens next — a 
 | ----------------------------------------------------- | -------------------- | --------------------------------------------------- |
 | `execution`                                           | `SpotwareTrading`    | Every fill, trigger and close on the account.       |
 | `orderError`                                          | `SpotwareTrading`    | Order rejections, including ones answering nothing. |
+| `trailingStopLossChanged`                             | `SpotwareTrading`    | The broker moved a position's trailing stop.        |
 | `price`                                               | `SpotwareMarketData` | Spot bid/ask updates.                               |
 | `trendbar`                                            | `SpotwareMarketData` | Live bars for a subscribed symbol/period.           |
 | `depth`                                               | `SpotwareMarketData` | Order book changes.                                 |
@@ -670,6 +673,10 @@ class SpotwareTrading {
         event: 'orderError',
         listener: (event: ProtoOAOrderErrorEvent) => void,
     ): this;
+    on(
+        event: 'trailingStopLossChanged',
+        listener: (event: ProtoOATrailingSLChangedEvent) => void,
+    ): this;
 }
 
 interface IPlaceMarketOrderParams {
@@ -926,29 +933,30 @@ Constructors: `new SpotwareTransport(options)`, `new SpotwareOAuthClient({ clien
 
 Every emitter also exposes `once()` and `off()` with the same signatures as `on()`.
 
-| Class                | Event                 | Listener arguments                                           |
-| -------------------- | --------------------- | ------------------------------------------------------------ |
-| `SpotwareTransport`  | `connected`           | —                                                            |
-|                      | `disconnected`        | `(reason: SpotwareDisconnectReason)`                         |
-|                      | `reconnecting`        | `(attempt: number, delayMs: number)`                         |
-|                      | `message`             | `(message: ProtoMessage)`                                    |
-|                      | `error`               | `(error: Error)`                                             |
-| `SpotwareClient`     | `authenticated`       | — (fires again after every reconnect)                        |
-|                      | `tokenRefreshed`      | `(token: ISpotwareOAuthToken)` — persist this                |
-|                      | `message`             | `(message: ProtoMessage)` — every message, correlated or not |
-|                      | `error`               | `(error: Error)` — includes forwarded transport errors       |
-| `SpotwareMarketData` | `price`               | `(update: ISpotwarePriceUpdate)`                             |
-|                      | `trendbar`            | `(symbolId: number, trendbar: ITrendbar)`                    |
-|                      | `depth`               | `(update: IDepthUpdate)`                                     |
-|                      | `error`               | `(error: Error)`                                             |
-| `SpotwareTrading`    | `execution`           | `(event: ProtoOAExecutionEvent)` — every fill/trigger/close  |
-|                      | `orderError`          | `(event: ProtoOAOrderErrorEvent)`                            |
-| `SpotwareAccount`    | `traderUpdated`       | `(trader: ProtoOATrader)`                                    |
-|                      | `marginChanged`       | `(change: IMarginChange)` — amount already converted         |
-|                      | `marginCallTriggered` | `(marginCall: ProtoOAMarginCall)`                            |
-|                      | `marginCallUpdated`   | `(marginCall: ProtoOAMarginCall)`                            |
-|                      | `accountDisconnected` | —                                                            |
-|                      | `tokenInvalidated`    | `(accountIds: number[], reason?: string)`                    |
+| Class                | Event                     | Listener arguments                                                   |
+| -------------------- | ------------------------- | -------------------------------------------------------------------- |
+| `SpotwareTransport`  | `connected`               | —                                                                    |
+|                      | `disconnected`            | `(reason: SpotwareDisconnectReason)`                                 |
+|                      | `reconnecting`            | `(attempt: number, delayMs: number)`                                 |
+|                      | `message`                 | `(message: ProtoMessage)`                                            |
+|                      | `error`                   | `(error: Error)`                                                     |
+| `SpotwareClient`     | `authenticated`           | — (fires again after every reconnect)                                |
+|                      | `tokenRefreshed`          | `(token: ISpotwareOAuthToken)` — persist this                        |
+|                      | `message`                 | `(message: ProtoMessage)` — every message, correlated or not         |
+|                      | `error`                   | `(error: Error)` — includes forwarded transport errors               |
+| `SpotwareMarketData` | `price`                   | `(update: ISpotwarePriceUpdate)`                                     |
+|                      | `trendbar`                | `(symbolId: number, trendbar: ITrendbar)`                            |
+|                      | `depth`                   | `(update: IDepthUpdate)`                                             |
+|                      | `error`                   | `(error: Error)`                                                     |
+| `SpotwareTrading`    | `execution`               | `(event: ProtoOAExecutionEvent)` — every fill/trigger/close          |
+|                      | `orderError`              | `(event: ProtoOAOrderErrorEvent)`                                    |
+|                      | `trailingStopLossChanged` | `(event: ProtoOATrailingSLChangedEvent)` — broker re-priced the stop |
+| `SpotwareAccount`    | `traderUpdated`           | `(trader: ProtoOATrader)`                                            |
+|                      | `marginChanged`           | `(change: IMarginChange)` — amount already converted                 |
+|                      | `marginCallTriggered`     | `(marginCall: ProtoOAMarginCall)`                                    |
+|                      | `marginCallUpdated`       | `(marginCall: ProtoOAMarginCall)`                                    |
+|                      | `accountDisconnected`     | —                                                                    |
+|                      | `tokenInvalidated`        | `(accountIds: number[], reason?: string)`                            |
 
 Events are emitted by the module that owns them, so you only receive an event if you have constructed that module — see [Events](#events) for why, and for the `client.on('message', ...)` escape hatch if you want a single stream instead.
 

@@ -20,6 +20,7 @@ import {
     ProtoOAReconcileReq,
     ProtoOAReconcileRes,
     ProtoOATradeSide,
+    ProtoOATrailingSLChangedEvent,
 } from '../../src/types';
 import { encodeFrame } from '../../src/transport/frame-codec';
 import { createTestClient } from '../shared/create-test-client';
@@ -50,6 +51,24 @@ function executionEventResponse(
             }),
         ).finish(),
         clientMsgId,
+    });
+}
+
+function trailingSLChangedResponse(
+    positionId: number,
+    stopPrice: number,
+): ProtoMessage {
+    return ProtoMessage.fromPartial({
+        payloadType: ProtoOAPayloadType.PROTO_OA_TRAILING_SL_CHANGED_EVENT,
+        payload: ProtoOATrailingSLChangedEvent.encode(
+            ProtoOATrailingSLChangedEvent.fromPartial({
+                ctidTraderAccountId: TEST_ACCOUNT_ID,
+                positionId,
+                orderId: 1,
+                stopPrice,
+                utcLastUpdateTimestamp: Date.now(),
+            }),
+        ).finish(),
     });
 }
 
@@ -559,5 +578,29 @@ describe('SpotwareTrading', () => {
         );
 
         expect((await rejected).errorCode).toBe('POSITION_NOT_FOUND');
+    });
+
+    it('emits a trailing stop-loss change that answers no request of its own', async () => {
+        const harness = createTestClient(server, port, createdClients);
+        const socketPromise = harness.nextServerSocket();
+        await harness.client.connect();
+        const socket = await socketPromise;
+
+        const trading = new SpotwareTrading(harness.client);
+        const changed = new Promise<ProtoOATrailingSLChangedEvent>((resolve) =>
+            trading.on('trailingStopLossChanged', resolve),
+        );
+
+        socket.write(
+            encodeFrame(
+                ProtoMessage.encode(
+                    trailingSLChangedResponse(77, 1.2345),
+                ).finish(),
+            ),
+        );
+
+        const event = await changed;
+        expect(event.positionId).toBe(77);
+        expect(event.stopPrice).toBeCloseTo(1.2345, 5);
     });
 });

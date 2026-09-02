@@ -5,7 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.4] - 2026-09-02
+## [0.4.5] - 2026-09-02
+
+### Added
+
+- **`SpotwareTrading` now emits `trailingStopLossChanged`** (`ProtoOATrailingSLChangedEvent`). `placeOrder`'s `trailingStopLoss` flag and `amendPositionStopLossTakeProfit` could already turn trailing on, but the broker then re-prices the stop on its own as the market moves, with nothing to await — the new stop price was only discoverable by polling `getOpenPositionsAndOrders`. Closes the asymmetry between setting a trailing stop and observing it move.
+
+### Changed
+
+- README: clarified that access token persistence across restarts is the consumer's responsibility, not something `SpotwareClient` does — it refreshes the token in memory automatically, but never writes it anywhere. This was implicit (via the linked example) but never stated outright, and came up as a real question.
 
 ### Added
 
