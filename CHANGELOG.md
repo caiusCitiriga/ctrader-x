@@ -5,7 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.3] - 2026-09-02
+## [0.4.4] - 2026-09-02
+
+### Added
+
+- **Dual CommonJS/ESM publishing.** The package previously shipped CommonJS only; `import` in a native-ESM Node project or a strict ESM-first bundler had to go through interop. `dist/esm/index.mjs` is now built alongside the existing `dist/index.js`, bundled from `src/index.ts` with `esbuild` (`--packages=external`, so `@bufbuild/protobuf` and Node built-ins stay real imports rather than getting vendored into the bundle) rather than reworking every internal relative import to the extension-explicit form Node's native ESM resolver requires — that would have meant touching every file under `src/`, whereas bundling needed none. `package.json#exports` now has `import`/`require` conditions pointing at each; `main` and the `default`/`require` condition are untouched, so existing CommonJS consumers get the exact same `dist/index.js` as before. Verified both entry points from an actually-installed tarball (`npm pack` into a scratch CJS project and a separate `"type": "module"` project), not just a relative `require`/`import` in-repo — both resolve via the package name and report the same 229 exports.
+- A `"module"` field (`dist/esm/index.mjs`) for older bundlers that key off it instead of `exports`.
+
+### Changed
+
+- Package size roughly doubled (161 files, 182 kB → 352 kB packed) from shipping the second build plus its source map. Traded deliberately for real ESM support rather than trying to shrink it — the CJS build already ships a `.js.map` per file, so leaving the ESM bundle's map in is consistent with that, not a new precedent.
 
 ### Changed
 

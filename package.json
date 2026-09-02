@@ -1,11 +1,14 @@
 {
     "name": "ctrader-x",
-    "version": "0.4.3",
+    "version": "0.4.4",
     "main": "dist/index.js",
+    "module": "dist/esm/index.mjs",
     "types": "dist/index.d.ts",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
+            "import": "./dist/esm/index.mjs",
+            "require": "./dist/index.js",
             "default": "./dist/index.js"
         },
         "./package.json": "./package.json"
@@ -27,8 +30,9 @@
     },
     "homepage": "https://github.com/caiusCitiriga/ctrader-x#readme",
     "scripts": {
-        "prepare": "tsc && husky",
-        "build": "tsc",
+        "prepare": "npm run build && husky",
+        "build": "tsc && npm run build:esm",
+        "build:esm": "esbuild src/index.ts --bundle --platform=node --target=node18 --format=esm --packages=external --sourcemap --outfile=dist/esm/index.mjs",
         "watch": "tsc --watch",
         "start:prod": "node dist/example/example.js",
         "start": "ts-node src/example/example.ts",
@@ -57,6 +61,7 @@
     "devDependencies": {
         "@types/node": "^20.19.43",
         "dotenv": "^16.4.7",
+        "esbuild": "^0.28.2",
         "grpc-tools": "^1.13.0",
         "husky": "^9.1.7",
         "prettier": "^3.5.3",

@@ -45,7 +45,7 @@ This is a connectivity/SDK library, not a dashboard or a UI. It gives you the bu
 npm install ctrader-x
 ```
 
-Requires Node.js 18 or later.
+Requires Node.js 18 or later. Ships as a dual CommonJS/ESM package — `require('ctrader-x')` and `import { SpotwareClient } from 'ctrader-x'` both work, with no configuration needed on your end.
 
 ## Prerequisites
 
